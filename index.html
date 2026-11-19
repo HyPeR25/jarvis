@@ -2,21 +2,56 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#07080b" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="J.A.R.V.I.S." />
 <title>J.A.R.V.I.S. // 3D Ecorché & Rolling Split</title>
 <link rel="icon" type="image/x-icon" href="./jarvis.ico">
+<link rel="apple-touch-icon" href="./jarvis.ico">
+<script>
+  // Dynamic PWA Manifest for Standalone Full-Screen Home Screen App
+  (function() {
+    const iconUrl = new URL('./jarvis.ico', window.location.href).href;
+    const manifest = {
+      name: "J.A.R.V.I.S. 3D Anatomy & Split",
+      short_name: "J.A.R.V.I.S.",
+      start_url: window.location.href,
+      display: "standalone",
+      background_color: "#07080b",
+      theme_color: "#07080b",
+      orientation: "portrait-primary",
+      icons: [
+        { src: iconUrl, sizes: "192x192", type: "image/x-icon", purpose: "any maskable" },
+        { src: iconUrl, sizes: "512x512", type: "image/x-icon", purpose: "any maskable" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+  })();
+</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #07080b; }
+  * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background: #07080b; }
 
   /* Custom subtle clinical scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: #f8fafc; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  /* Remove default number spinners for clean mobile touch */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
 
   #viewport-bg {
     background: radial-gradient(circle at 52% 44%, #181c24 0%, #0a0c10 58%, #050608 100%);
@@ -36,7 +71,7 @@
   }
 
   #sidebar {
-    transition: transform 0.25s ease, width 0.25s ease, min-width 0.25s ease;
+    transition: transform 0.25s ease, width 0.25s ease, min-width 0.25s ease, height 0.25s ease;
   }
   #sidebar.collapsed {
     transform: translateX(-100%);
@@ -45,36 +80,44 @@
     overflow: hidden;
     border: none;
   }
+  @media (max-width: 767px) {
+    #sidebar.collapsed {
+      transform: translateY(-100%);
+      height: 0 !important;
+      width: 100% !important;
+    }
+  }
 </style>
 </head>
-<body class="flex flex-col md:flex-row h-screen w-screen overflow-hidden select-none">
+<body class="flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden select-none">
 
-  <!-- LEFT: BioDigital / MSD Clinical White Inspector Panel -->
-  <aside id="sidebar" class="w-full md:w-[440px] md:min-w-[410px] md:max-w-[470px] h-[54vh] md:h-screen bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-2xl">
+  <!-- LEFT / TOP: BioDigital / MSD Clinical White Inspector Panel -->
+  <aside id="sidebar" class="w-full md:w-[440px] md:min-w-[410px] md:max-w-[470px] h-[58dvh] md:h-screen bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-2xl">
     
     <!-- Clinical Header -->
-    <div class="px-5 pt-4 pb-3 bg-white border-b border-slate-200">
-      <div class="flex items-center justify-between gap-2 mb-1.5">
+    <div class="px-4 md:px-5 pt-3 md:pt-4 pb-2.5 md:pb-3 bg-white border-b border-slate-200">
+      <div class="flex items-center justify-between gap-2 mb-1">
         <span id="queue-badge" class="text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-700">
           QUEUED NEXT UP
         </span>
         <div class="flex items-center gap-2">
+          <span id="sync-dot" class="w-2 h-2 rounded-full bg-emerald-500" title="Firebase Cloud Sync Active"></span>
           <span id="postpone-counter" class="text-[11px] font-semibold text-slate-500">Rest days paused: 0</span>
           <button id="btn-copy-sync" class="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition" title="Copy one-line workout state summary">
             Copy Sync
           </button>
         </div>
       </div>
-      <h1 id="day-title" class="text-[17px] font-extrabold text-slate-900 leading-snug">
+      <h1 id="day-title" class="text-[16px] md:text-[17px] font-extrabold text-slate-900 leading-snug">
         Day 2 — Back & Biceps
       </h1>
-      <p id="day-subtitle" class="text-xs text-slate-500 mt-0.5">
+      <p id="day-subtitle" class="text-[11px] md:text-xs text-slate-500 mt-0.5">
         6-Day V-Taper & Jacked Arms Split • 60–75 Min Hypertrophy
       </p>
     </div>
 
     <!-- Rolling Queue Controls & Custom Clinical Day Selector Dropdown -->
-    <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 space-y-2">
+    <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 space-y-2">
       <div id="day-dropdown" class="relative w-full">
         <button id="day-dropdown-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"
           class="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-white border border-slate-300/90 hover:border-slate-400 shadow-xs text-left transition focus:outline-none focus:ring-2 focus:ring-slate-900/10">
@@ -98,23 +141,23 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="btn-postpone" class="flex-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-amber-400/80 bg-amber-50 hover:bg-amber-100 text-amber-900 transition" title="Pause rolling split for a study/rest day without skipping">
+        <button id="btn-postpone" class="flex-1 text-xs font-bold px-2.5 py-2 md:py-1.5 rounded-lg border border-amber-400/80 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-900 transition" title="Pause rolling split for a study/rest day without skipping">
           Postpone (Rest Day)
         </button>
-        <button id="btn-complete" class="flex-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-emerald-600/80 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition" title="Mark session complete & advance queue">
+        <button id="btn-complete" class="flex-1 text-xs font-bold px-2.5 py-2 md:py-1.5 rounded-lg border border-emerald-600/80 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-900 transition" title="Mark session complete & advance queue">
           Done → Next
         </button>
       </div>
     </div>
 
     <!-- Muscle Legend & Full Day Highlight Bar -->
-    <div class="px-5 py-2 bg-white border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-      <div class="flex items-center gap-3.5 font-medium">
+    <div class="px-4 md:px-5 py-1.5 md:py-2 bg-white border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+      <div class="flex items-center gap-3 font-medium">
         <span class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-[#b91c1c] inline-block shadow-xs"></span>Primary Target
+          <span class="w-2.5 h-2.5 rounded-full bg-[#b91c1c] inline-block shadow-xs"></span>Primary
         </span>
         <span class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-[#b45309] inline-block shadow-xs"></span>Secondary Synergist
+          <span class="w-2.5 h-2.5 rounded-full bg-[#b45309] inline-block shadow-xs"></span>Synergist
         </span>
       </div>
       <div class="flex items-center gap-1.5">
@@ -128,7 +171,22 @@
     </div>
 
     <!-- Scrollable Exercise Cards + Set/Weight/Rep Logger -->
-    <div id="exercise-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 bg-slate-50/60" style="overflow-anchor: none;">
+    <div id="exercise-list" class="flex-1 overflow-y-auto px-3.5 md:px-4 py-2.5 md:py-3 space-y-2.5 bg-slate-50/60" style="overflow-anchor: none;">
+    </div>
+
+    <!-- Floating Mobile/Desktop Rest Timer Bar -->
+    <div id="rest-timer-bar" class="hidden px-4 py-2 bg-slate-900 text-white border-t border-slate-800 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Rest</span>
+        <span id="rest-timer-display" class="text-sm font-extrabold font-mono text-amber-400">01:30</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button data-sec="60" class="rest-preset-btn text-[11px] font-bold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">60s</button>
+        <button data-sec="90" class="rest-preset-btn text-[11px] font-bold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">90s</button>
+        <button data-sec="120" class="rest-preset-btn text-[11px] font-bold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">2m</button>
+        <button id="btn-stop-timer" class="text-[11px] font-bold px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white">Stop</button>
+      </div>
     </div>
 
     <!-- Collapsible J.A.R.V.I.S. Gemini Live Command Bar -->
@@ -173,12 +231,12 @@
     </div>
   </aside>
 
-  <!-- RIGHT: Pitch-Black BioDigital / MSD Studio 3D Ecorché Viewport -->
-  <main id="viewport-bg" class="flex-1 relative h-[46vh] md:h-screen overflow-hidden">
+  <!-- RIGHT / BOTTOM: Pitch-Black BioDigital / MSD Studio 3D Ecorché Viewport -->
+  <main id="viewport-bg" class="flex-1 relative h-[42dvh] md:h-screen overflow-hidden">
     <canvas id="ecorche-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
 
     <!-- Floating White BioDigital Vertical Toolbar -->
-    <div class="absolute top-4 left-4 flex flex-col gap-1.5 z-10">
+    <div class="absolute top-3 left-3 md:top-4 md:left-4 flex flex-col gap-1.5 z-10">
       <button id="btn-toggle-sidebar" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-bold text-sm shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Toggle Split Inspector">
         ☰
       </button>
@@ -200,7 +258,7 @@
     </div>
 
     <!-- Top-Right Model Mode & Local .GLB Loader -->
-    <div class="absolute top-4 right-4 flex items-center gap-2 z-10">
+    <div class="absolute top-3 right-3 md:top-4 md:right-4 flex items-center gap-2 z-10">
       <span id="model-badge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/85 border border-white/15 text-slate-200 text-[11px] font-semibold backdrop-blur-md">
         <span class="w-2 h-2 rounded-full bg-red-600"></span>
         Neutral Ash Ecorché Active
@@ -212,12 +270,12 @@
     </div>
 
     <!-- Bottom Anatomical Latin + Common Status Pill -->
-    <div id="status-banner" class="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[92%] px-4 py-2 rounded-full bg-slate-900/90 border border-white/15 text-slate-100 text-xs font-semibold backdrop-blur-md shadow-xl truncate z-10">
+    <div id="status-banner" class="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 max-w-[92%] px-3.5 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 border border-white/15 text-slate-100 text-[11px] md:text-xs font-semibold backdrop-blur-md shadow-xl truncate z-10">
       Day 2 — Back & Biceps • Latissimus Dorsi, Biceps Brachii & Forearms
     </div>
 
     <!-- Toast Notification (Never alert()) -->
-    <div id="toast" class="pointer-events-none opacity-0 transition-opacity duration-200 fixed bottom-16 right-5 bg-slate-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xl border border-white/15 z-50">
+    <div id="toast" class="pointer-events-none opacity-0 transition-opacity duration-200 fixed bottom-16 right-4 md:right-5 bg-slate-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xl border border-white/15 z-50">
     </div>
   </main>
 
@@ -273,6 +331,69 @@
   </div>
 
 <script>
+// ============================================================================
+// 0. FIREBASE CLOUD AUTO-SYNC (Preserved & Unified)
+// ============================================================================
+const DB_URL = "https://jarvis-sync-37fef-default-rtdb.asia-southeast1.firebasedatabase.app/jarvis_state.json";
+
+async function pullCloudSync() {
+  const dot = document.getElementById('sync-dot');
+  try {
+    const res = await fetch(DB_URL);
+    const cloudData = await res.json();
+    if (dot) dot.className = "w-2 h-2 rounded-full bg-emerald-500";
+    if (cloudData && cloudData.updatedAt > (Number(localStorage.getItem("jarvis_updated")) || 0)) {
+      Object.keys(cloudData.storage || {}).forEach(k => localStorage.setItem(k, cloudData.storage[k]));
+      localStorage.setItem("jarvis_updated", cloudData.updatedAt);
+      location.reload();
+    }
+  } catch (e) {
+    if (dot) dot.className = "w-2 h-2 rounded-full bg-amber-400";
+  }
+}
+
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, val) {
+  _origSetItem(key, val);
+  if (key === "jarvis_updated") return;
+  const now = Date.now();
+  _origSetItem("jarvis_updated", now);
+  const snapshot = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k !== "jarvis_updated") snapshot[k] = localStorage.getItem(k);
+  }
+  fetch(DB_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ updatedAt: now, storage: snapshot })
+  }).catch(() => {});
+};
+
+// Offline Service Worker Cache for GitHub Pages (HTTPS)
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const swCode = `
+    const CACHE = 'jarvis-pwa-v1';
+    self.addEventListener('install', e => {
+      self.skipWaiting();
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html', './jarvis.ico']).catch(() => {})));
+    });
+    self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+    self.addEventListener('fetch', e => {
+      if (e.request.method !== 'GET' || e.request.url.includes('firebasedatabase.app')) return;
+      e.respondWith(
+        fetch(e.request).then(res => {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
+          return res;
+        }).catch(() => caches.match(e.request))
+      );
+    });
+  `;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+}
+
 // ============================================================================
 // 1. ANATOMICAL MUSCLE DEFINITIONS & LOCKED-IN 6-DAY V-TAPER / ARMS SPLIT
 // ============================================================================
@@ -380,7 +501,7 @@ const DEFAULT_SPLIT = [
 ];
 
 // ============================================================================
-// 2. PERSISTENT STATE (Day 2 Pull Queued Next Up) & TOAST HELPER
+// 2. PERSISTENT STATE (Day 2 Pull Queued Next Up) & TOAST + REST TIMER
 // ============================================================================
 const STORAGE_KEY = 'jarvis_ecorche_studio_v3';
 let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
@@ -405,6 +526,47 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add('opacity-0'), 2800);
 }
+
+// Rest Countdown Timer
+let restInterval = null;
+let restRemaining = 0;
+
+function startRestTimer(seconds = 90) {
+  const bar = document.getElementById('rest-timer-bar');
+  const display = document.getElementById('rest-timer-display');
+  if (!bar || !display) return;
+  clearInterval(restInterval);
+  restRemaining = seconds;
+  bar.classList.remove('hidden');
+  const renderTime = () => {
+    const m = String(Math.floor(restRemaining / 60)).padStart(2, '0');
+    const s = String(restRemaining % 60).padStart(2, '0');
+    display.textContent = `${m}:${s}`;
+  };
+  renderTime();
+  restInterval = setInterval(() => {
+    restRemaining -= 1;
+    if (restRemaining <= 0) {
+      clearInterval(restInterval);
+      bar.classList.add('hidden');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      showToast('Rest complete — hit your next set!');
+    } else {
+      renderTime();
+    }
+  }, 1000);
+}
+
+function stopRestTimer() {
+  clearInterval(restInterval);
+  const bar = document.getElementById('rest-timer-bar');
+  if (bar) bar.classList.add('hidden');
+}
+
+document.querySelectorAll('.rest-preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => startRestTimer(Number(btn.dataset.sec) || 90));
+});
+document.getElementById('btn-stop-timer').addEventListener('click', stopRestTimer);
 
 // ============================================================================
 // 3. THREE.JS STUDIO SCENE & PERSISTENT INDEXEDDB .GLB LOADER
@@ -446,9 +608,7 @@ async function saveGlbToCache(name, arrayBuffer) {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-  } catch (e) {
-    // Ignore storage restriction in private/sandboxed windows
-  }
+  } catch (e) {}
 }
 
 async function getCachedGlb() {
@@ -544,7 +704,6 @@ async function mountGlbBuffer(arrayBuffer, fileName, silent = false) {
             `)
             .replace('#include <color_fragment>', `
               #include <color_fragment>
-              // Convert desaturated vertex color into sculptural neutral slate/ash grey ecorché
               float luma = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
               vec3 baseCol = mix(vec3(0.18,0.19,0.21), vec3(0.54,0.57,0.61), smoothstep(0.12,0.72,luma));
               float tendon = smoothstep(0.66,0.78,luma);
@@ -558,9 +717,7 @@ async function mountGlbBuffer(arrayBuffer, fileName, silent = false) {
               pH *= (1.0 - tendon * 0.65); sH *= (1.0 - tendon * 0.65);
               float pulse = 0.90 + 0.10 * sin(uTime * 3.2);
               vec3 c = mix(baseCol * 0.62, baseCol, max(clamp(pH+sH,0.0,1.0), 0.38));
-              // Earthy Ochre / Burnt Sienna for secondary synergists
               c = mix(c, vec3(0.76,0.44,0.09), sH * 0.90);
-              // Rich Anatomical Crimson Red for primary target muscles
               c = mix(c, vec3(0.78,0.11,0.14) * pulse, pH * 0.94);
               diffuseColor.rgb = c;
             `);
@@ -590,9 +747,7 @@ async function autoRestoreGlb() {
       await saveGlbToCache(DEFAULT_GLB_NAME, buf);
       await mountGlbBuffer(buf, DEFAULT_GLB_NAME, true);
     }
-  } catch (e) {
-    // Fallback to built-in sculptural ecorché until user loads .glb once
-  }
+  } catch (e) {}
 }
 
 document.getElementById('glb-file-input').addEventListener('change', async (e) => {
@@ -636,7 +791,6 @@ outerRing.position.y = 0.002;
 pedestalGroup.add(outerRing);
 scene.add(pedestalGroup);
 
-// Generate Procedural Striated Muscle Fiber Canvas Texture (Neutral Ash Grey)
 function createStriationTexture() {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
@@ -650,7 +804,6 @@ function createStriationTexture() {
     ctx.fillStyle = `rgb(${v}, ${v + 2}, ${v + 5})`;
     ctx.fillRect(0, y, 256, 1.5);
   }
-  // Subtle neutral fascia micro-lines
   ctx.strokeStyle = 'rgba(226, 232, 240, 0.14)';
   ctx.lineWidth = 1;
   for (let i = 0; i < 18; i++) {
@@ -667,10 +820,8 @@ function createStriationTexture() {
 }
 
 const striationTex = createStriationTexture();
-
-// Build Sculpted Procedural Anatomical Ecorché Figure (1.78m heroic athletic proportions)
 const proceduralGroup = new THREE.Group();
-const muscleMaterials = {}; // Map muscleKey -> array of MeshStandardMaterials
+const muscleMaterials = {};
 
 function makeMuscleMat(muscleKey) {
   const mat = new THREE.MeshStandardMaterial({
@@ -688,16 +839,8 @@ function makeMuscleMat(muscleKey) {
   return mat;
 }
 
-const tendonMat = new THREE.MeshStandardMaterial({
-  color: 0xd8dce2,
-  roughness: 0.36,
-  metalness: 0.05
-});
-
-const boneCoreMat = new THREE.MeshStandardMaterial({
-  color: 0x373c44,
-  roughness: 0.72
-});
+const tendonMat = new THREE.MeshStandardMaterial({ color: 0xd8dce2, roughness: 0.36, metalness: 0.05 });
+const boneCoreMat = new THREE.MeshStandardMaterial({ color: 0x373c44, roughness: 0.72 });
 
 function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
   positions.forEach((pos, idx) => {
@@ -713,7 +856,6 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
   const sphere = new THREE.SphereGeometry(1, 28, 22);
   const capsule = new THREE.CylinderGeometry(0.85, 0.72, 2, 24);
 
-  // Cranium, Jaw & Neck (Sternocleidomastoid)
   const head = new THREE.Mesh(sphere, tendonMat);
   head.position.set(0, 1.66, 0.01);
   head.scale.set(0.088, 0.112, 0.102);
@@ -730,7 +872,6 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     [[0.024, 0.065, 0.026], [0.024, 0.065, 0.026]]
   );
 
-  // Deep Torso Core & Linea Alba Tendon
   const ribcage = new THREE.Mesh(sphere, boneCoreMat);
   ribcage.position.set(0, 1.26, -0.005);
   ribcage.scale.set(0.155, 0.22, 0.105);
@@ -741,21 +882,18 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
   sternumTendon.scale.set(0.016, 0.17, 0.012);
   proceduralGroup.add(sternumTendon);
 
-  // Upper Chest (Clavicular Pectoralis)
   addSculptedBellies(proceduralGroup, sphere, makeMuscleMat('upper_chest'),
     [[-0.078, 1.385, 0.078], [0.078, 1.385, 0.078]],
     [[0.18, 0.22, -0.25], [0.18, -0.22, 0.25]],
     [[0.088, 0.044, 0.045], [0.088, 0.044, 0.045]]
   );
 
-  // Mid/Lower Chest (Sternal Pectoralis Major)
   addSculptedBellies(proceduralGroup, sphere, makeMuscleMat('chest'),
     [[-0.082, 1.305, 0.088], [0.082, 1.305, 0.088]],
     [[0.08, 0.18, -0.12], [0.08, -0.18, 0.12]],
     [[0.092, 0.068, 0.052], [0.092, 0.068, 0.052]]
   );
 
-  // Abs & Obliques (6-Pack Rectus Abdominis + Serratus/Obliques)
   const absMat = makeMuscleMat('abs');
   for (let row = 0; row < 3; row++) {
     const yPos = 1.155 - row * 0.068;
@@ -772,7 +910,6 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     [[0.044, 0.11, 0.068], [0.044, 0.11, 0.068]]
   );
 
-  // Upper Back & Traps (Trapezius + Rhomboids + Spine Tendon)
   const upperBackMat = makeMuscleMat('upper_back');
   addSculptedBellies(proceduralGroup, sphere, upperBackMat,
     [[-0.065, 1.47, -0.048], [0.065, 1.47, -0.048], [-0.068, 1.33, -0.088], [0.068, 1.33, -0.088]],
@@ -785,7 +922,6 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
   spineTendon.scale.set(0.015, 0.22, 0.014);
   proceduralGroup.add(spineTendon);
 
-  // Lats (Latissimus Dorsi V-Taper Sweeps)
   const latsMat = makeMuscleMat('lats');
   addSculptedBellies(proceduralGroup, sphere, latsMat,
     [[-0.125, 1.21, -0.052], [0.125, 1.21, -0.052]],
@@ -793,13 +929,11 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     [[0.078, 0.155, 0.062], [0.078, 0.155, 0.062]]
   );
 
-  // Thoracolumbar Fascia (Lower Back Diamond Tendon)
   const lowerBackFascia = new THREE.Mesh(sphere, tendonMat);
   lowerBackFascia.position.set(0, 1.03, -0.075);
   lowerBackFascia.scale.set(0.078, 0.085, 0.032);
   proceduralGroup.add(lowerBackFascia);
 
-  // 3D Deltoids (Front, Side, Rear Heads)
   const frontDeltMat = makeMuscleMat('front_delts');
   const sideDeltMat = makeMuscleMat('side_delts');
   const rearDeltMat = makeMuscleMat('rear_delts');
@@ -822,59 +956,50 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     proceduralGroup.add(rd);
   });
 
-  // Arms: Biceps, Triceps & Forearms (Heroic Athletic Sweep)
   const bicepMat = makeMuscleMat('biceps');
   const tricepMat = makeMuscleMat('triceps');
   const forearmMat = makeMuscleMat('forearms');
 
   [-1, 1].forEach(side => {
-    // Biceps Brachii (Long & Short Heads)
     const bic = new THREE.Mesh(sphere, bicepMat);
     bic.position.set(side * 0.268, 1.24, 0.025);
     bic.rotation.set(0.08, 0, side * -0.18);
     bic.scale.set(0.046, 0.105, 0.048);
     proceduralGroup.add(bic);
 
-    // Triceps Brachii (Lateral & Long Heads Horseshoe)
     const triLong = new THREE.Mesh(sphere, tricepMat);
     triLong.position.set(side * 0.262, 1.245, -0.036);
     triLong.rotation.set(-0.08, 0, side * -0.18);
     triLong.scale.set(0.048, 0.112, 0.048);
     proceduralGroup.add(triLong);
 
-    // Elbow Olecranon Tendon
     const elbow = new THREE.Mesh(sphere, tendonMat);
     elbow.position.set(side * 0.305, 1.12, -0.012);
     elbow.scale.set(0.038, 0.034, 0.038);
     proceduralGroup.add(elbow);
 
-    // Forearms (Brachioradialis + Flexors/Extensors)
     const fa = new THREE.Mesh(capsule, forearmMat);
     fa.position.set(side * 0.355, 0.99, 0.018);
     fa.rotation.set(0.18, 0, side * -0.24);
     fa.scale.set(0.046, 0.115, 0.044);
     proceduralGroup.add(fa);
 
-    // Wrist Tendon & Hand
     const wrist = new THREE.Mesh(sphere, tendonMat);
     wrist.position.set(side * 0.405, 0.85, 0.042);
     wrist.scale.set(0.032, 0.055, 0.024);
     proceduralGroup.add(wrist);
   });
 
-  // Pelvis / Hip Girdle (Neutral Anatomical Base)
   const pelvis = new THREE.Mesh(sphere, boneCoreMat);
   pelvis.position.set(0, 0.91, -0.01);
   pelvis.scale.set(0.145, 0.095, 0.098);
   proceduralGroup.add(pelvis);
 
-  // Legs: Quads, Hamstrings, Patellar Tendons & Calves
   const quadMat = makeMuscleMat('quads');
   const hamMat = makeMuscleMat('hamstrings');
   const calfMat = makeMuscleMat('calves');
 
   [-1, 1].forEach(side => {
-    // Quadriceps Sweep (Vastus Lateralis, Rectus Femoris, VMO)
     const quadOuter = new THREE.Mesh(sphere, quadMat);
     quadOuter.position.set(side * 0.118, 0.71, 0.028);
     quadOuter.rotation.z = side * 0.05;
@@ -886,20 +1011,17 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     quadInner.scale.set(0.056, 0.145, 0.058);
     proceduralGroup.add(quadInner);
 
-    // Hamstrings (Biceps Femoris & Semitendinosus)
     const ham = new THREE.Mesh(sphere, hamMat);
     ham.position.set(side * 0.105, 0.70, -0.042);
     ham.rotation.z = side * 0.04;
     ham.scale.set(0.068, 0.175, 0.064);
     proceduralGroup.add(ham);
 
-    // Knee / Patellar Tendon
     const knee = new THREE.Mesh(sphere, tendonMat);
     knee.position.set(side * 0.102, 0.50, 0.012);
     knee.scale.set(0.052, 0.048, 0.052);
     proceduralGroup.add(knee);
 
-    // Calves (Gastrocnemius Diamond + Achilles Tendon)
     const calf = new THREE.Mesh(sphere, calfMat);
     calf.position.set(side * 0.104, 0.34, -0.024);
     calf.scale.set(0.054, 0.125, 0.054);
@@ -910,7 +1032,6 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
     shin.scale.set(0.036, 0.19, 0.038);
     proceduralGroup.add(shin);
 
-    // Foot
     const foot = new THREE.Mesh(sphere, tendonMat);
     foot.position.set(side * 0.105, 0.032, 0.045);
     foot.scale.set(0.044, 0.028, 0.095);
@@ -921,11 +1042,11 @@ function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
 })();
 
 // ============================================================================
-// 4. ORBIT, ZOOM, PAN & SMOOTH CAMERA PRESETS (Zero External Addon Needed)
+// 4. ORBIT, ZOOM, PAN & SMOOTH CAMERA PRESETS
 // ============================================================================
 const camState = {
-  theta: -2.55,     // Horizontal orbit angle (radians)
-  phi: 1.44,        // Polar angle from +Y
+  theta: -2.55,
+  phi: 1.44,
   radius: 2.55,
   target: new THREE.Vector3(0, 0.95, 0),
   desiredTheta: null,
@@ -965,7 +1086,6 @@ function flyToAngle(angleKey) {
   camState.desiredTarget = new THREE.Vector3(...p.target);
 }
 
-// Mouse & Touch Orbit/Zoom/Pan Listeners
 let isDragging = false;
 let isPanning = false;
 let prevPointer = { x: 0, y: 0 };
@@ -1060,7 +1180,7 @@ function update3DHighlights() {
 }
 
 // ============================================================================
-// 6. CLINICAL INSPECTOR, CUSTOM DROPDOWN & SET / WEIGHT (KG) / REPS LOGGER UI
+// 6. CLINICAL INSPECTOR, THUMB STEPPERS, SET COMPLETION & CUSTOM DROPDOWN
 // ============================================================================
 let swappingIdx = null;
 const dropdownTrigger = document.getElementById('day-dropdown-trigger');
@@ -1091,6 +1211,15 @@ document.addEventListener('keydown', (e) => {
     closeSwapModal();
   }
 });
+
+function parseRestSeconds(metaStr) {
+  if (!metaStr) return 90;
+  const minMatch = metaStr.match(/Rest:\s*([\d.]+)\s*m/i);
+  if (minMatch) return Math.round(parseFloat(minMatch[1]) * 60);
+  const secMatch = metaStr.match(/Rest:\s*(\d+)\s*s/i);
+  if (secMatch) return parseInt(secMatch[1], 10);
+  return 90;
+}
 
 function renderInspector(preserveScroll = true) {
   const list = document.getElementById('exercise-list');
@@ -1174,15 +1303,26 @@ function renderInspector(preserveScroll = true) {
     const targetBadge = bestSet.w > 0 ? `PR / Beat: ${bestSet.w} kg × ${bestSet.r}` : `Target: ${ex.target || 'Set Baseline'}`;
 
     const setsHtml = (ex.sets || []).map((s, sIdx) => `
-      <div class="flex items-center gap-1.5 text-[11px] bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1">
-        <span class="font-bold text-slate-400 w-9">Set ${sIdx + 1}</span>
-        <input type="number" step="0.5" value="${s.w}" data-ex="${idx}" data-set="${sIdx}" data-field="w"
-          class="set-input w-16 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:border-blue-500" />
-        <span class="text-slate-400 font-semibold">kg ×</span>
-        <input type="number" step="1" value="${s.r}" data-ex="${idx}" data-set="${sIdx}" data-field="r"
-          class="set-input w-12 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:border-blue-500" />
-        <span class="text-slate-400 font-semibold">reps</span>
-        <button data-ex="${idx}" data-set="${sIdx}" class="del-set-btn ml-auto text-slate-400 hover:text-rose-600 font-bold px-1" title="Remove set">✕</button>
+      <div class="flex items-center gap-1 text-[11px] ${s.done ? 'bg-emerald-50/90 border-emerald-300' : 'bg-slate-50 border-slate-200/80'} border rounded-lg px-2 py-1.5 transition">
+        <button data-ex="${idx}" data-set="${sIdx}" class="done-set-btn w-6 h-6 rounded-md flex items-center justify-center font-extrabold text-xs shrink-0 transition ${
+          s.done ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-300 text-slate-400 hover:border-emerald-500'
+        }" title="Mark set done & start rest timer">✓</button>
+        <span class="font-bold text-slate-500 w-7 text-[10px]">S${sIdx + 1}</span>
+        <div class="flex items-center bg-white border border-slate-300 rounded overflow-hidden">
+          <button type="button" data-ex="${idx}" data-set="${sIdx}" data-field="w" data-delta="-2.5" class="step-btn px-1.5 py-1 text-slate-600 hover:bg-slate-100 active:bg-slate-200 font-bold">−</button>
+          <input type="number" step="0.5" value="${s.w}" data-ex="${idx}" data-set="${sIdx}" data-field="w"
+            class="set-input w-11 text-center font-bold text-slate-900 bg-white py-0.5 focus:outline-none" />
+          <button type="button" data-ex="${idx}" data-set="${sIdx}" data-field="w" data-delta="2.5" class="step-btn px-1.5 py-1 text-slate-600 hover:bg-slate-100 active:bg-slate-200 font-bold">+</button>
+        </div>
+        <span class="text-slate-400 font-semibold text-[10px]">kg</span>
+        <div class="flex items-center bg-white border border-slate-300 rounded overflow-hidden">
+          <button type="button" data-ex="${idx}" data-set="${sIdx}" data-field="r" data-delta="-1" class="step-btn px-1.5 py-1 text-slate-600 hover:bg-slate-100 active:bg-slate-200 font-bold">−</button>
+          <input type="number" step="1" value="${s.r}" data-ex="${idx}" data-set="${sIdx}" data-field="r"
+            class="set-input w-8 text-center font-bold text-slate-900 bg-white py-0.5 focus:outline-none" />
+          <button type="button" data-ex="${idx}" data-set="${sIdx}" data-field="r" data-delta="1" class="step-btn px-1.5 py-1 text-slate-600 hover:bg-slate-100 active:bg-slate-200 font-bold">+</button>
+        </div>
+        <span class="text-slate-400 font-semibold text-[10px]">r</span>
+        <button data-ex="${idx}" data-set="${sIdx}" class="del-set-btn ml-auto text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5" title="Remove set">✕</button>
       </div>
     `).join('');
 
@@ -1215,13 +1355,12 @@ function renderInspector(preserveScroll = true) {
             + Add Set
           </button>
         </div>
-        <div class="space-y-1">
+        <div class="space-y-1.5">
           ${setsHtml}
         </div>
       </div>
     `;
 
-    // Clicking card selects/highlights exercise on 3D Ecorché
     card.addEventListener('click', (e) => {
       if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
       state.selectedExIdx = state.selectedExIdx === idx ? null : idx;
@@ -1230,7 +1369,6 @@ function renderInspector(preserveScroll = true) {
       update3DHighlights();
     });
 
-    // Set input changes (update PR badge live without wiping focus or scroll)
     card.querySelectorAll('.set-input').forEach(inp => {
       inp.addEventListener('input', (e) => {
         const eIdx = Number(e.target.dataset.ex);
@@ -1249,19 +1387,49 @@ function renderInspector(preserveScroll = true) {
       });
     });
 
-    // Add Set button
+    // Thumb Stepper Buttons (- / +)
+    card.querySelectorAll('.step-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eIdx = Number(btn.dataset.ex);
+        const sIdx = Number(btn.dataset.set);
+        const field = btn.dataset.field;
+        const delta = Number(btn.dataset.delta);
+        const curr = Number(day.exercises[eIdx].sets[sIdx][field]) || 0;
+        const next = Math.max(0, Math.round((curr + delta) * 10) / 10);
+        day.exercises[eIdx].sets[sIdx][field] = next;
+        saveState();
+        renderInspector(true);
+      });
+    });
+
+    // Done Set Checkmark -> Starts Rest Countdown Timer
+    card.querySelectorAll('.done-set-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eIdx = Number(btn.dataset.ex);
+        const sIdx = Number(btn.dataset.set);
+        const setObj = day.exercises[eIdx].sets[sIdx];
+        setObj.done = !setObj.done;
+        saveState();
+        renderInspector(true);
+        if (setObj.done) {
+          startRestTimer(parseRestSeconds(day.exercises[eIdx].meta));
+        }
+      });
+    });
+
     card.querySelector('.add-set-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       const eIdx = Number(e.target.dataset.ex);
       const prev = day.exercises[eIdx].sets;
       const last = prev[prev.length - 1] || { w: 15, r: 10 };
-      prev.push({ w: last.w, r: last.r });
+      prev.push({ w: last.w, r: last.r, done: false });
       saveState();
       renderInspector(true);
       showToast('Added set to ' + day.exercises[eIdx].name);
     });
 
-    // Remove Set button
     card.querySelectorAll('.del-set-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1275,7 +1443,6 @@ function renderInspector(preserveScroll = true) {
       });
     });
 
-    // Swap Exercise button
     card.querySelector('.swap-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       swappingIdx = idx;
@@ -1322,7 +1489,10 @@ document.getElementById('btn-postpone').addEventListener('click', () => {
 });
 
 document.getElementById('btn-complete').addEventListener('click', () => {
-  const finishedName = state.split[state.queuedDayIdx].name;
+  const finishedDay = state.split[state.queuedDayIdx];
+  const finishedName = finishedDay.name;
+  finishedDay.exercises.forEach(ex => (ex.sets || []).forEach(s => { s.done = false; }));
+  stopRestTimer();
   state.queuedDayIdx = (state.queuedDayIdx + 1) % state.split.length;
   state.viewedDayIdx = state.queuedDayIdx;
   state.selectedExIdx = null;
@@ -1352,7 +1522,6 @@ document.getElementById('btn-copy-sync').addEventListener('click', () => {
   showToast('Copied workout & set/weight sync string to clipboard!');
 });
 
-// Swap Modal Handlers
 function closeSwapModal() {
   const modal = document.getElementById('swap-modal');
   modal.classList.add('hidden');
@@ -1387,7 +1556,6 @@ document.getElementById('swap-save').addEventListener('click', () => {
   closeSwapModal();
 });
 
-// Floating BioDigital Viewport Toolbar
 document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
   document.getElementById('sidebar').classList.toggle('collapsed');
   setTimeout(handleResize, 260);
@@ -1404,7 +1572,7 @@ document.getElementById('btn-auto-rotate').addEventListener('click', (e) => {
 });
 
 // ============================================================================
-// 8. J.A.R.V.I.S. GEMINI LIVE COMMAND BAR (Structured Action Execution)
+// 8. J.A.R.V.I.S. GEMINI LIVE COMMAND BAR
 // ============================================================================
 const jarvisDrawer = document.getElementById('jarvis-drawer');
 const jarvisChevron = document.getElementById('jarvis-chevron');
@@ -1513,7 +1681,6 @@ Respond ONLY with valid JSON matching this schema:
     respBox.textContent = parsed.reply || 'Command executed.';
     inputEl.value = '';
   } catch (err) {
-    // Offline/No-Key Smart Local Fallback Parser
     const lower = cmd.toLowerCase();
     if (lower.includes('postpone') || lower.includes('rest')) {
       state.postponedDays += 1;
@@ -1535,7 +1702,7 @@ Respond ONLY with valid JSON matching this schema:
 }
 
 // ============================================================================
-// 9. ANIMATION LOOP & RESPONSIVE RESIZE
+// 9. ANIMATION LOOP, RESPONSIVE RESIZE & UNIFIED STARTUP
 // ============================================================================
 function handleResize() {
   camera.aspect = container.clientWidth / container.clientHeight;
@@ -1550,7 +1717,6 @@ function animate() {
   const t = clock.getElapsedTime();
   glbUniforms.uTime.value = t;
 
-  // Smooth camera transition to target muscle angle
   if (camState.desiredTheta !== null) {
     camState.theta += (camState.desiredTheta - camState.theta) * 0.09;
     camState.phi += (camState.desiredPhi - camState.phi) * 0.09;
@@ -1565,7 +1731,6 @@ function animate() {
     updateCameraFromSpherical();
   }
 
-  // Rich Anatomical Red (Primary) & Warm Earthy Ochre (Secondary) on Neutral Ash Grey Body
   const pulse = 0.85 + 0.15 * Math.sin(t * 3.4);
   const hasAnyHighlight = activePrimarySet.size > 0 || activeSecondarySet.size > 0;
 
@@ -1593,45 +1758,13 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-window.onload = function () {
+window.addEventListener('load', () => {
   renderInspector();
   update3DHighlights();
   autoRestoreGlb();
   animate();
-};
-const DB_URL = "https://jarvis-sync-37fef-default-rtdb.asia-southeast1.firebasedatabase.app/jarvis_state.json";
-
-async function pullCloudSync() {
-  try {
-    const res = await fetch(DB_URL);
-    const cloudData = await res.json();
-    if (cloudData && cloudData.updatedAt > (Number(localStorage.getItem("jarvis_updated")) || 0)) {
-      Object.keys(cloudData.storage || {}).forEach(k => localStorage.setItem(k, cloudData.storage[k]));
-      localStorage.setItem("jarvis_updated", cloudData.updatedAt);
-      location.reload();
-    }
-  } catch (e) {}
-}
-
-const _origSetItem = localStorage.setItem.bind(localStorage);
-localStorage.setItem = function(key, val) {
-  _origSetItem(key, val);
-  if (key === "jarvis_updated") return;
-  const now = Date.now();
-  _origSetItem("jarvis_updated", now);
-  const snapshot = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k !== "jarvis_updated") snapshot[k] = localStorage.getItem(k);
-  }
-  fetch(DB_URL, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ updatedAt: now, storage: snapshot })
-  }).catch(() => {});
-};
-
-window.addEventListener("load", pullCloudSync);
+  pullCloudSync();
+});
 </script>
 </body>
 </html>
