@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>J.A.R.V.I.S. // 3D Ecorché & Rolling Split</title>
+<link rel="icon" type="image/x-icon" href="./jarvis.ico">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #07080b; }
+
+  /* Custom subtle clinical scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f8fafc; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+  #viewport-bg {
+    background: radial-gradient(circle at 52% 44%, #181c24 0%, #0a0c10 58%, #050608 100%);
+  }
+
+  .ex-card {
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .ex-card:hover {
+    border-color: #94a3b8;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  }
+  .ex-card.active {
+    border-color: #b91c1c;
+    background: #fef8f8;
+    box-shadow: 0 4px 16px rgba(185, 28, 28, 0.11);
+  }
+
+  #sidebar {
+    transition: transform 0.25s ease, width 0.25s ease, min-width 0.25s ease;
+  }
+  #sidebar.collapsed {
+    transform: translateX(-100%);
+    width: 0 !important;
+    min-width: 0 !important;
+    overflow: hidden;
+    border: none;
+  }
+</style>
+</head>
+<body class="flex flex-col md:flex-row h-screen w-screen overflow-hidden select-none">
+
+  <!-- LEFT: BioDigital / MSD Clinical White Inspector Panel -->
+  <aside id="sidebar" class="w-full md:w-[440px] md:min-w-[410px] md:max-w-[470px] h-[54vh] md:h-screen bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-2xl">
+    
+    <!-- Clinical Header -->
+    <div class="px-5 pt-4 pb-3 bg-white border-b border-slate-200">
+      <div class="flex items-center justify-between gap-2 mb-1.5">
+        <span id="queue-badge" class="text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-700">
+          QUEUED NEXT UP
+        </span>
+        <div class="flex items-center gap-2">
+          <span id="postpone-counter" class="text-[11px] font-semibold text-slate-500">Rest days paused: 0</span>
+          <button id="btn-copy-sync" class="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition" title="Copy one-line workout state summary">
+            Copy Sync
+          </button>
+        </div>
+      </div>
+      <h1 id="day-title" class="text-[17px] font-extrabold text-slate-900 leading-snug">
+        Day 2 — Back & Biceps
+      </h1>
+      <p id="day-subtitle" class="text-xs text-slate-500 mt-0.5">
+        6-Day V-Taper & Jacked Arms Split • 60–75 Min Hypertrophy
+      </p>
+    </div>
+
+    <!-- Rolling Queue Controls & Custom Clinical Day Selector Dropdown -->
+    <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 space-y-2">
+      <div id="day-dropdown" class="relative w-full">
+        <button id="day-dropdown-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"
+          class="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl bg-white border border-slate-300/90 hover:border-slate-400 shadow-xs text-left transition focus:outline-none focus:ring-2 focus:ring-slate-900/10">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <span id="dd-trigger-day" class="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-900 text-white">DAY 2</span>
+              <span id="dd-trigger-next" class="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Next Up</span>
+              <span id="dd-trigger-title" class="text-xs font-extrabold text-slate-900 truncate">Back & Biceps</span>
+            </div>
+            <div id="dd-trigger-sub" class="text-[10.5px] text-slate-500 truncate mt-0.5">V-Taper Width + Bicep Peak • ~70 Min</div>
+          </div>
+          <svg id="dd-chevron" class="w-4 h-4 text-slate-500 shrink-0 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+          </svg>
+        </button>
+
+        <!-- Custom Floating Popover Menu -->
+        <div id="day-dropdown-menu" role="listbox"
+          class="hidden absolute left-0 right-0 top-[calc(100%+6px)] bg-white rounded-xl border border-slate-200 shadow-2xl py-1.5 z-40 max-h-72 overflow-y-auto">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-postpone" class="flex-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-amber-400/80 bg-amber-50 hover:bg-amber-100 text-amber-900 transition" title="Pause rolling split for a study/rest day without skipping">
+          Postpone (Rest Day)
+        </button>
+        <button id="btn-complete" class="flex-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-emerald-600/80 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 transition" title="Mark session complete & advance queue">
+          Done → Next
+        </button>
+      </div>
+    </div>
+
+    <!-- Muscle Legend & Full Day Highlight Bar -->
+    <div class="px-5 py-2 bg-white border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+      <div class="flex items-center gap-3.5 font-medium">
+        <span class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#b91c1c] inline-block shadow-xs"></span>Primary Target
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#b45309] inline-block shadow-xs"></span>Secondary Synergist
+        </span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-scroll-top" class="text-[11px] font-bold px-2 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 transition" title="Scroll Exercise List to Top">
+          ↑ Top
+        </button>
+        <button id="btn-highlight-day" class="text-[11px] font-bold px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition">
+          Highlight Full Day
+        </button>
+      </div>
+    </div>
+
+    <!-- Scrollable Exercise Cards + Set/Weight/Rep Logger -->
+    <div id="exercise-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 bg-slate-50/60" style="overflow-anchor: none;">
+    </div>
+
+    <!-- Collapsible J.A.R.V.I.S. Gemini Live Command Bar -->
+    <div class="border-t border-slate-200 bg-white">
+      <button id="btn-toggle-jarvis" class="w-full px-4 py-2 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 transition">
+        <span class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          J.A.R.V.I.S. Gemini Live Command Bar
+        </span>
+        <span id="jarvis-chevron" class="text-slate-400 text-[11px]">▲ Expand</span>
+      </button>
+
+      <div id="jarvis-drawer" class="hidden px-4 pb-3 pt-1 bg-slate-50 border-t border-slate-200 space-y-2">
+        <div class="flex items-center gap-1.5">
+          <input id="gemini-api-key" type="password" placeholder="Optional: Paste Gemini API Key (blank uses built-in AI)" class="flex-1 text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-blue-500" />
+          <button id="btn-save-key" class="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition">
+            Save Key
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <input id="jarvis-command-input" type="text" placeholder='e.g. "Postpone today" or "Swap Preacher Curl for Cable Curl"' class="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:border-blue-500" />
+          <button id="btn-run-jarvis" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#b91c1c] hover:bg-red-800 text-white transition whitespace-nowrap">
+            Execute
+          </button>
+        </div>
+
+        <div class="flex flex-wrap gap-1">
+          <button class="quick-cmd text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 hover:border-slate-400 text-slate-600" data-cmd="Postpone today for a study rest day">
+            + Postpone Today
+          </button>
+          <button class="quick-cmd text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 hover:border-slate-400 text-slate-600" data-cmd="Suggest a high-hypertrophy replacement for the selected exercise">
+            + AI Swap Idea
+          </button>
+          <button class="quick-cmd text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 hover:border-slate-400 text-slate-600" data-cmd="Complete today and advance to next split day">
+            + Complete Day
+          </button>
+        </div>
+
+        <div id="jarvis-response" class="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 leading-relaxed hidden"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Pitch-Black BioDigital / MSD Studio 3D Ecorché Viewport -->
+  <main id="viewport-bg" class="flex-1 relative h-[46vh] md:h-screen overflow-hidden">
+    <canvas id="ecorche-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+    <!-- Floating White BioDigital Vertical Toolbar -->
+    <div class="absolute top-4 left-4 flex flex-col gap-1.5 z-10">
+      <button id="btn-toggle-sidebar" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-bold text-sm shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Toggle Split Inspector">
+        ☰
+      </button>
+      <button id="btn-view-front" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-extrabold text-xs shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Anterior (Front) View">
+        F
+      </button>
+      <button id="btn-view-back" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-extrabold text-xs shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Posterior (Back) View">
+        B
+      </button>
+      <button id="btn-view-34" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-extrabold text-xs shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="3/4 Studio Angle">
+        ¾
+      </button>
+      <button id="btn-reset-cam" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-bold text-base shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Reset Camera">
+        ⌖
+      </button>
+      <button id="btn-auto-rotate" class="w-9 h-9 rounded-lg bg-white/95 hover:bg-white text-slate-900 font-bold text-xs shadow-lg border border-slate-200/80 flex items-center justify-center transition" title="Toggle 360° Auto-Rotate">
+        ↻
+      </button>
+    </div>
+
+    <!-- Top-Right Model Mode & Local .GLB Loader -->
+    <div class="absolute top-4 right-4 flex items-center gap-2 z-10">
+      <span id="model-badge" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/85 border border-white/15 text-slate-200 text-[11px] font-semibold backdrop-blur-md">
+        <span class="w-2 h-2 rounded-full bg-red-600"></span>
+        Neutral Ash Ecorché Active
+      </span>
+      <label class="px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-900 text-xs font-bold shadow-lg cursor-pointer transition flex items-center gap-1.5" title="Load 2284_gerard_corentin_-_ecorche_-_anatomy.glb locally">
+        <span>Load .GLB</span>
+        <input type="file" id="glb-file-input" accept=".glb,.gltf" class="hidden" />
+      </label>
+    </div>
+
+    <!-- Bottom Anatomical Latin + Common Status Pill -->
+    <div id="status-banner" class="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[92%] px-4 py-2 rounded-full bg-slate-900/90 border border-white/15 text-slate-100 text-xs font-semibold backdrop-blur-md shadow-xl truncate z-10">
+      Day 2 — Back & Biceps • Latissimus Dorsi, Biceps Brachii & Forearms
+    </div>
+
+    <!-- Toast Notification (Never alert()) -->
+    <div id="toast" class="pointer-events-none opacity-0 transition-opacity duration-200 fixed bottom-16 right-5 bg-slate-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg shadow-xl border border-white/15 z-50">
+    </div>
+  </main>
+
+  <!-- Permanent Exercise Swap Modal -->
+  <div id="swap-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xs z-50 items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-md p-5 shadow-2xl border border-slate-200 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-extrabold text-slate-900">Swap Exercise Permanently</h3>
+        <button id="swap-close-x" class="text-slate-400 hover:text-slate-700 font-bold text-sm">✕</button>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Exercise Name</label>
+        <input id="swap-name" type="text" class="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-500" />
+      </div>
+      <div class="grid grid-cols-2 gap-2.5">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Sets × Reps | Rest</label>
+          <input id="swap-meta" type="text" class="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Primary Muscle</label>
+          <select id="swap-primary" class="w-full text-xs px-2.5 py-2 rounded-lg border border-slate-300 text-slate-900 bg-white focus:outline-none focus:border-blue-500">
+            <option value="chest">Chest (Pectoralis Major)</option>
+            <option value="upper_chest">Upper Chest (Clavicular)</option>
+            <option value="lats">Lats (Latissimus Dorsi)</option>
+            <option value="upper_back">Upper Back / Traps</option>
+            <option value="front_delts">Front Delts (Anterior)</option>
+            <option value="side_delts">Side Delts (Lateral)</option>
+            <option value="rear_delts">Rear Delts (Posterior)</option>
+            <option value="biceps">Biceps & Brachialis</option>
+            <option value="triceps">Triceps Brachii</option>
+            <option value="forearms">Forearms & Brachioradialis</option>
+            <option value="quads">Quads (Quadriceps)</option>
+            <option value="hamstrings">Hamstrings</option>
+            <option value="calves">Calves</option>
+            <option value="abs">Abs & Core</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Execution Cue</label>
+        <input id="swap-cue" type="text" class="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:border-blue-500" />
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="swap-cancel" class="text-xs font-semibold px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700">
+          Cancel
+        </button>
+        <button id="swap-save" class="text-xs font-bold px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white">
+          Save Permanent Swap
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================================
+// 1. ANATOMICAL MUSCLE DEFINITIONS & LOCKED-IN 6-DAY V-TAPER / ARMS SPLIT
+// ============================================================================
+const MUSCLE_INFO = {
+  chest:       { short: 'Chest',       latin: 'Pectoralis Major (Sternal)' },
+  upper_chest: { short: 'Upper Chest', latin: 'Pectoralis Major (Clavicular)' },
+  lats:        { short: 'Lats',        latin: 'Latissimus Dorsi' },
+  upper_back:  { short: 'Upper Back',  latin: 'Trapezius & Rhomboids' },
+  front_delts: { short: 'Front Delts', latin: 'Anterior Deltoid' },
+  side_delts:  { short: 'Side Delts',  latin: 'Lateral Deltoid' },
+  rear_delts:  { short: 'Rear Delts',  latin: 'Posterior Deltoid' },
+  biceps:      { short: 'Biceps',      latin: 'Biceps Brachii & Brachialis' },
+  triceps:     { short: 'Triceps',     latin: 'Triceps Brachii' },
+  forearms:    { short: 'Forearms',    latin: 'Brachioradialis & Flexors' },
+  quads:       { short: 'Quads',       latin: 'Quadriceps Femoris' },
+  hamstrings:  { short: 'Hamstrings',  latin: 'Biceps Femoris & Semitendinosus' },
+  calves:      { short: 'Calves',      latin: 'Gastrocnemius & Soleus' },
+  abs:         { short: 'Abs & Core',  latin: 'Rectus Abdominis & Obliques' }
+};
+
+const DEFAULT_SPLIT = [
+  {
+    id: 'day1',
+    name: 'Day 1 — Chest & Triceps',
+    subtitle: 'Heavy Press + Tricep Mass • ~65 Min',
+    defaultAngle: 'front',
+    exercises: [
+      { name: 'Incline Dumbbell Bench Press (30°)', meta: '3 × 6–8 | Rest: 2.5m', cue: 'Upper-chest shelf thickness.', primary: ['upper_chest', 'chest'], secondary: ['front_delts', 'triceps'], angle: 'front', target: 'Set Baseline', sets: [{ w: 20, r: 8 }, { w: 20, r: 8 }, { w: 20, r: 7 }] },
+      { name: 'Flat Dumbbell Bench Press', meta: '3 × 8–10 | Rest: 2m', cue: 'Deep bottom stretch, drive dumbbells together at top.', primary: ['chest'], secondary: ['front_delts', 'triceps'], angle: 'front', target: 'Set Baseline', sets: [{ w: 20, r: 10 }, { w: 20, r: 9 }, { w: 20, r: 8 }] },
+      { name: 'Pec Deck Fly', meta: '3 × 10–12 | Rest: 90s', cue: '1-sec peak squeeze, final set rest-pause.', primary: ['chest', 'upper_chest'], secondary: ['front_delts'], angle: 'front', target: 'Set Baseline', sets: [{ w: 35, r: 12 }, { w: 35, r: 11 }, { w: 35, r: 10 }] },
+      { name: 'EZ-Bar Skullcrusher (Incline Bench)', meta: '3 × 8–10 | Rest: 90s', cue: 'Loaded stretch on tricep long head.', primary: ['triceps'], secondary: [], angle: 'side', target: 'Set Baseline', sets: [{ w: 15, r: 10 }, { w: 15, r: 9 }, { w: 15, r: 8 }] },
+      { name: 'Cable Overhead Tricep Extension (Rope)', meta: '3 × 10–12 | Rest: 75s', cue: 'Full behind-head stretch.', primary: ['triceps'], secondary: [], angle: 'back', target: 'Set Baseline', sets: [{ w: 15, r: 12 }, { w: 15, r: 11 }, { w: 15, r: 10 }] },
+      { name: 'Tricep Rope Pushdown', meta: '2 × 12–15 | Rest: 60s', cue: 'Flare rope at bottom to full medial/lateral failure.', primary: ['triceps'], secondary: [], angle: 'side', target: 'Set Baseline', sets: [{ w: 20, r: 15 }, { w: 20, r: 13 }] }
+    ]
+  },
+  {
+    id: 'day2',
+    name: 'Day 2 — Back & Biceps',
+    subtitle: 'V-Taper Width + Bicep Peak • ~70 Min',
+    defaultAngle: 'back',
+    exercises: [
+      { name: 'Wide-Grip Lat Pulldown', meta: '4 × 8–10 | Rest: 2m', cue: 'Drive elbows down toward hips for maximum V-taper width.', primary: ['lats'], secondary: ['upper_back', 'biceps', 'forearms'], angle: 'back', target: 'Set Baseline', sets: [{ w: 45, r: 10 }, { w: 45, r: 9 }, { w: 45, r: 9 }, { w: 45, r: 8 }] },
+      { name: 'Chest-Supported Incline Dumbbell Row', meta: '3 × 8–10 | Rest: 2m', cue: 'Heavy mid-back & upper-lat density with zero lower-back drain.', primary: ['upper_back', 'lats'], secondary: ['rear_delts', 'biceps', 'forearms'], angle: 'back', target: 'Set Baseline', sets: [{ w: 17.5, r: 10 }, { w: 17.5, r: 9 }, { w: 17.5, r: 8 }] },
+      { name: 'Seated Cable Row (Neutral Grip)', meta: '3 × 10–12 | Rest: 90s', cue: 'Hard scapular squeeze at sternum.', primary: ['upper_back', 'lats'], secondary: ['rear_delts', 'biceps'], angle: 'back', target: 'Set Baseline', sets: [{ w: 40, r: 12 }, { w: 40, r: 11 }, { w: 40, r: 10 }] },
+      { name: 'Incline Dumbbell Curl (45° Bench)', meta: '3 × 8–10 | Rest: 90s', cue: 'Maximum long-head bicep stretch.', primary: ['biceps'], secondary: ['forearms'], angle: 'front', target: 'Set Baseline', sets: [{ w: 10, r: 10 }, { w: 10, r: 9 }, { w: 10, r: 8 }] },
+      { name: 'EZ-Bar Preacher Curl', meta: '3 × 10–12 | Rest: 75s', cue: 'Strict short-head peak isolation.', primary: ['biceps'], secondary: ['forearms'], angle: 'front', target: 'Set Baseline', sets: [{ w: 15, r: 12 }, { w: 15, r: 11 }, { w: 15, r: 10 }] },
+      { name: 'Dumbbell Cross-Body Hammer Curl', meta: '3 × 10–12 | Rest: 60s', cue: 'Thickens brachialis & upper forearm.', primary: ['biceps', 'forearms'], secondary: [], angle: 'front', target: 'Set Baseline', sets: [{ w: 12.5, r: 12 }, { w: 12.5, r: 11 }, { w: 12.5, r: 10 }] }
+    ]
+  },
+  {
+    id: 'day3',
+    name: 'Day 3 — Legs & Core',
+    subtitle: 'Quads, Hamstrings, Calves & 6-Pack (No Glute Compounds) • ~70 Min',
+    defaultAngle: 'front',
+    exercises: [
+      { name: 'Leg Extension', meta: '4 × 10–12 | Rest: 90s', cue: 'Pre-exhausts quads cleanly with zero glute involvement.', primary: ['quads'], secondary: [], angle: 'front', target: 'Set Baseline', sets: [{ w: 40, r: 12 }, { w: 40, r: 12 }, { w: 45, r: 10 }, { w: 45, r: 10 }] },
+      { name: 'Heels-Elevated Dumbbell Goblet Squat', meta: '4 × 8–10 | Rest: 2m', cue: 'Upright torso isolates pure quad sweep.', primary: ['quads'], secondary: ['calves'], angle: 'front', target: 'Set Baseline', sets: [{ w: 22.5, r: 10 }, { w: 22.5, r: 10 }, { w: 22.5, r: 9 }, { w: 22.5, r: 8 }] },
+      { name: 'Seated Leg Curl', meta: '4 × 10–12 | Rest: 90s', cue: 'Loaded hamstring stretch for maximum growth.', primary: ['hamstrings'], secondary: ['calves'], angle: 'back', target: 'Set Baseline', sets: [{ w: 35, r: 12 }, { w: 35, r: 11 }, { w: 35, r: 10 }, { w: 35, r: 10 }] },
+      { name: 'Standing Calf Raise', meta: '4 × 12–15 | Rest: 75s', cue: '2-sec pause at bottom stretch.', primary: ['calves'], secondary: [], angle: 'back', target: 'Set Baseline', sets: [{ w: 40, r: 15 }, { w: 40, r: 14 }, { w: 40, r: 13 }, { w: 40, r: 12 }] },
+      { name: 'Weighted Machine Crunch', meta: '3 × 12–15 | Rest: 60s', cue: 'Deep ab wall hypertrophy.', primary: ['abs'], secondary: [], angle: 'front', target: 'Set Baseline', sets: [{ w: 25, r: 15 }, { w: 25, r: 14 }, { w: 25, r: 12 }] },
+      { name: "Captain's Chair Knee-to-Chest Raise", meta: '3 × 12–15 | Rest: 60s', cue: 'Curl pelvis upward for lower abs.', primary: ['abs'], secondary: [], angle: 'front', target: 'Set Baseline', sets: [{ w: 0, r: 15 }, { w: 0, r: 14 }, { w: 0, r: 12 }] }
+    ]
+  },
+  {
+    id: 'day4',
+    name: 'Day 4 — Chest & Back',
+    subtitle: 'Upper Torso Thickness & V-Taper • ~65 Min',
+    defaultAngle: 'front',
+    exercises: [
+      { name: 'Incline Machine Chest Press', meta: '3 × 8–10 | Rest: 2m', cue: '2-sec negative, drive elbows inward.', primary: ['upper_chest', 'chest'], secondary: ['front_delts', 'triceps'], angle: 'front', target: 'Set Baseline', sets: [{ w: 20, r: 10 }, { w: 20, r: 9 }, { w: 20, r: 8 }] },
+      { name: 'Single-Arm Dumbbell Row (Bench-Supported)', meta: '3 × 8–10/arm | Rest: 90s', cue: 'Heavy unilateral lat pull from hip to pocket.', primary: ['lats', 'upper_back'], secondary: ['rear_delts', 'biceps', 'forearms'], angle: 'back', target: 'Set Baseline', sets: [{ w: 20, r: 10 }, { w: 20, r: 9 }, { w: 20, r: 8 }] },
+      { name: 'Low-to-High Cable Fly', meta: '3 × 12–15 | Rest: 75s', cue: 'Upper-inner chest striations.', primary: ['upper_chest'], secondary: ['front_delts'], angle: 'front', target: 'Set Baseline', sets: [{ w: 10, r: 15 }, { w: 10, r: 13 }, { w: 10, r: 12 }] },
+      { name: 'Close-Grip / MAG-Grip Lat Pulldown', meta: '3 × 10–12 | Rest: 90s', cue: 'Deep lower-lat sweep.', primary: ['lats'], secondary: ['biceps', 'upper_back'], angle: 'back', target: 'Set Baseline', sets: [{ w: 40, r: 12 }, { w: 40, r: 11 }, { w: 40, r: 10 }] },
+      { name: 'Heavy Dumbbell Shrug', meta: '3 × 10–12 | Rest: 75s', cue: '2-sec hold at top for upper-trap yoke.', primary: ['upper_back'], secondary: ['forearms'], angle: 'back', target: 'Set Baseline', sets: [{ w: 22.5, r: 12 }, { w: 22.5, r: 12 }, { w: 22.5, r: 10 }] },
+      { name: 'Cable Rope Crunch', meta: '3 × 12–15 | Rest: 60s', cue: 'Weighted 6-pack thickness.', primary: ['abs'], secondary: [], angle: 'front', target: 'Set Baseline', sets: [{ w: 30, r: 15 }, { w: 30, r: 14 }, { w: 30, r: 12 }] }
+    ]
+  },
+  {
+    id: 'day5',
+    name: 'Day 5 — Shoulders & Traps',
+    subtitle: '3D Boulder Delts & Frame Width • ~60 Min',
+    defaultAngle: 'front',
+    exercises: [
+      { name: 'Seated Dumbbell Shoulder Press', meta: '4 × 8–10 | Rest: 2m', cue: 'Heavy free-weight front & side delt mass.', primary: ['front_delts', 'side_delts'], secondary: ['triceps', 'upper_back'], angle: 'front', target: 'Set Baseline', sets: [{ w: 15, r: 10 }, { w: 15, r: 9 }, { w: 15, r: 8 }, { w: 15, r: 8 }] },
+      { name: 'Cable Lateral Raise (Behind-the-Back)', meta: '4 × 12–15 | Rest: 60s', cue: 'Unbroken medial delt tension for maximum shoulder width.', primary: ['side_delts'], secondary: ['upper_back'], angle: 'front', target: 'Set Baseline', sets: [{ w: 5, r: 15 }, { w: 5, r: 14 }, { w: 5, r: 13 }, { w: 5, r: 12 }] },
+      { name: 'Seated Dumbbell Lateral Raise', meta: '3 × 12–15 | Rest: 60s', cue: 'Strict form, drop set on final set.', primary: ['side_delts'], secondary: ['upper_back'], angle: 'front', target: 'Set Baseline', sets: [{ w: 7.5, r: 15 }, { w: 7.5, r: 13 }, { w: 7.5, r: 12 }] },
+      { name: 'Reverse Pec Deck Fly', meta: '4 × 12–15 | Rest: 60s', cue: '3D rear delt cap.', primary: ['rear_delts'], secondary: ['upper_back'], angle: 'back', target: 'Set Baseline', sets: [{ w: 25, r: 15 }, { w: 25, r: 14 }, { w: 25, r: 13 }, { w: 25, r: 12 }] },
+      { name: 'Incline Bench Rear Delt Dumbbell Fly', meta: '3 × 12–15 | Rest: 60s', cue: 'Rear delt & upper-back posture tie-in.', primary: ['rear_delts'], secondary: ['upper_back'], angle: 'back', target: 'Set Baseline', sets: [{ w: 7.5, r: 15 }, { w: 7.5, r: 14 }, { w: 7.5, r: 12 }] }
+    ]
+  },
+  {
+    id: 'day6',
+    name: 'Day 6 — Arms & Forearms',
+    subtitle: '100% Fresh Arm Specialization • ~65 Min',
+    defaultAngle: 'front',
+    exercises: [
+      { name: 'EZ-Bar Preacher Curl', meta: '4 × 8–10 | Rest: 90s', cue: 'Heavy, strict bicep peak overload while 100% fresh.', primary: ['biceps'], secondary: ['forearms'], angle: 'front', target: 'Set Baseline', sets: [{ w: 17.5, r: 10 }, { w: 17.5, r: 9 }, { w: 17.5, r: 8 }, { w: 17.5, r: 8 }] },
+      { name: 'Overhead Dumbbell Tricep Extension (Two-Hand)', meta: '4 × 8–10 | Rest: 90s', cue: 'Heavy free-weight tricep long-head mass.', primary: ['triceps'], secondary: [], angle: 'back', target: 'Set Baseline', sets: [{ w: 17.5, r: 10 }, { w: 17.5, r: 10 }, { w: 17.5, r: 9 }, { w: 17.5, r: 8 }] },
+      { name: 'Bayesian Cable Curl (Facing Away)', meta: '3 × 10–12 | Rest: 75s', cue: 'Maximum stretch-mediated bicep growth.', primary: ['biceps'], secondary: ['forearms'], angle: 'front', target: 'Set Baseline', sets: [{ w: 10, r: 12 }, { w: 10, r: 11 }, { w: 10, r: 10 }] },
+      { name: 'Cross-Body Cable Tricep Extension', meta: '3 × 12–15 | Rest: 75s', cue: 'Medial & lateral head horseshoe definition.', primary: ['triceps'], secondary: [], angle: 'side', target: 'Set Baseline', sets: [{ w: 10, r: 15 }, { w: 10, r: 13 }, { w: 10, r: 12 }] },
+      { name: 'Standing Alternating DB Curl + Reverse Cable Pushdown', meta: '3 × 12 each | Rest: 60s', cue: 'Massive sleeve-stretching arm pump superset.', primary: ['biceps', 'triceps'], secondary: ['forearms'], angle: 'front', target: 'Set Baseline', sets: [{ w: 12.5, r: 12 }, { w: 12.5, r: 12 }, { w: 12.5, r: 11 }] },
+      { name: 'Dumbbell Wrist Curl + Reverse EZ-Bar Curl', meta: '3 × 15 each | Rest: 60s', cue: 'Thick, vascular forearms superset.', primary: ['forearms'], secondary: ['biceps'], angle: 'front', target: 'Set Baseline', sets: [{ w: 10, r: 15 }, { w: 10, r: 15 }, { w: 10, r: 14 }] }
+    ]
+  }
+];
+
+// ============================================================================
+// 2. PERSISTENT STATE (Day 2 Pull Queued Next Up) & TOAST HELPER
+// ============================================================================
+const STORAGE_KEY = 'jarvis_ecorche_studio_v3';
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {
+  queuedDayIdx: 1,
+  viewedDayIdx: 1,
+  selectedExIdx: null,
+  postponedDays: 0,
+  apiKey: '',
+  split: DEFAULT_SPLIT
+};
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('opacity-0');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('opacity-0'), 2800);
+}
+
+// ============================================================================
+// 3. THREE.JS STUDIO SCENE & PERSISTENT INDEXEDDB .GLB LOADER
+// ============================================================================
+const container = document.getElementById('viewport-bg');
+const canvas = document.getElementById('ecorche-canvas');
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(36, container.clientWidth / container.clientHeight, 0.05, 50);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+
+const DEFAULT_GLB_NAME = '2284_gerard_corentin_-_ecorche_-_anatomy.glb';
+const IDB_NAME = 'jarvis_ecorche_db';
+const IDB_STORE = 'models';
+
+function openModelDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(IDB_STORE)) {
+        req.result.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveGlbToCache(name, arrayBuffer) {
+  try {
+    const db = await openModelDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put({ name, buffer: arrayBuffer }, 'primary_ecorche');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    // Ignore storage restriction in private/sandboxed windows
+  }
+}
+
+async function getCachedGlb() {
+  try {
+    const db = await openModelDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get('primary_ecorche');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+let loadedGlbGroup = null;
+let gltfLoaderReady = null;
+const MUSCLE_KEYS = Object.keys(MUSCLE_INFO);
+const glbUniforms = {
+  uPrimaryMask: { value: new Float32Array(14) },
+  uSecondaryMask: { value: new Float32Array(14) },
+  uTime: { value: 0 }
+};
+
+function ensureGLTFLoader() {
+  if (window.THREE && THREE.GLTFLoader) return Promise.resolve();
+  if (gltfLoaderReady) return gltfLoaderReady;
+  gltfLoaderReady = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('GLTFLoader failed'));
+    document.head.appendChild(script);
+  });
+  return gltfLoaderReady;
+}
+
+async function mountGlbBuffer(arrayBuffer, fileName, silent = false) {
+  await ensureGLTFLoader();
+  const loader = new THREE.GLTFLoader();
+  loader.parse(arrayBuffer, '', (gltf) => {
+    if (loadedGlbGroup) scene.remove(loadedGlbGroup);
+    loadedGlbGroup = gltf.scene;
+
+    const box = new THREE.Box3().setFromObject(loadedGlbGroup);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const scale = 1.78 / Math.max(size.y, 0.001);
+    loadedGlbGroup.scale.setScalar(scale);
+
+    const sBox = new THREE.Box3().setFromObject(loadedGlbGroup);
+    const sCenter = new THREE.Vector3();
+    sBox.getCenter(sCenter);
+    loadedGlbGroup.position.set(-sCenter.x, -sBox.min.y, -sCenter.z);
+
+    loadedGlbGroup.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material.vertexColors = true;
+        child.material.roughness = 0.45;
+        child.material.onBeforeCompile = (shader) => {
+          shader.uniforms.uPrimaryMask = glbUniforms.uPrimaryMask;
+          shader.uniforms.uSecondaryMask = glbUniforms.uSecondaryMask;
+          shader.uniforms.uTime = glbUniforms.uTime;
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+            .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', `
+              #include <common>
+              varying vec3 vWPos;
+              uniform float uPrimaryMask[14];
+              uniform float uSecondaryMask[14];
+              uniform float uTime;
+              float mWeight(int i, vec3 p) {
+                float y = p.y; float ax = abs(p.x); float z = p.z;
+                if (i==0) return smoothstep(1.16,1.21,y)*(1.0-smoothstep(1.33,1.38,y))*(1.0-smoothstep(0.15,0.21,ax))*smoothstep(0.02,0.07,z);
+                if (i==1) return smoothstep(1.32,1.36,y)*(1.0-smoothstep(1.44,1.48,y))*(1.0-smoothstep(0.16,0.22,ax))*smoothstep(0.02,0.07,z);
+                if (i==2) return smoothstep(1.04,1.12,y)*(1.0-smoothstep(1.36,1.42,y))*smoothstep(0.06,0.12,ax)*(1.0-smoothstep(0.19,0.25,ax))*(1.0-smoothstep(-0.02,0.04,z));
+                if (i==3) return smoothstep(1.22,1.28,y)*(1.0-smoothstep(1.54,1.60,y))*(1.0-smoothstep(0.13,0.19,ax))*(1.0-smoothstep(-0.03,0.02,z));
+                if (i==4) return smoothstep(1.33,1.38,y)*(1.0-smoothstep(1.47,1.52,y))*smoothstep(0.16,0.20,ax)*(1.0-smoothstep(0.26,0.31,ax))*smoothstep(0.00,0.05,z);
+                if (i==5) return smoothstep(1.33,1.38,y)*(1.0-smoothstep(1.48,1.53,y))*smoothstep(0.20,0.24,ax)*(1.0-smoothstep(0.31,0.36,ax));
+                if (i==6) return smoothstep(1.33,1.38,y)*(1.0-smoothstep(1.47,1.52,y))*smoothstep(0.16,0.20,ax)*(1.0-smoothstep(0.27,0.32,ax))*(1.0-smoothstep(-0.04,0.01,z));
+                if (i==7) return smoothstep(1.11,1.16,y)*(1.0-smoothstep(1.33,1.38,y))*smoothstep(0.22,0.26,ax)*(1.0-smoothstep(0.38,0.44,ax))*smoothstep(-0.02,0.03,z);
+                if (i==8) return smoothstep(1.11,1.16,y)*(1.0-smoothstep(1.34,1.39,y))*smoothstep(0.22,0.26,ax)*(1.0-smoothstep(0.38,0.44,ax))*(1.0-smoothstep(-0.06,-0.01,z));
+                if (i==9) return smoothstep(0.86,0.92,y)*(1.0-smoothstep(1.11,1.15,y))*smoothstep(0.30,0.35,ax)*(1.0-smoothstep(0.54,0.60,ax));
+                if (i==10) return smoothstep(0.52,0.58,y)*(1.0-smoothstep(0.88,0.94,y))*(1.0-smoothstep(0.21,0.26,ax))*smoothstep(-0.01,0.04,z);
+                if (i==11) return smoothstep(0.51,0.57,y)*(1.0-smoothstep(0.82,0.88,y))*(1.0-smoothstep(0.20,0.25,ax))*(1.0-smoothstep(-0.05,0.00,z));
+                if (i==12) return smoothstep(0.14,0.20,y)*(1.0-smoothstep(0.45,0.50,y))*(1.0-smoothstep(0.19,0.24,ax))*(1.0-smoothstep(-0.03,0.02,z));
+                if (i==13) return smoothstep(0.92,0.98,y)*(1.0-smoothstep(1.17,1.22,y))*(1.0-smoothstep(0.13,0.18,ax))*smoothstep(0.03,0.08,z);
+                return 0.0;
+              }
+            `)
+            .replace('#include <color_fragment>', `
+              #include <color_fragment>
+              // Convert desaturated vertex color into sculptural neutral slate/ash grey ecorché
+              float luma = dot(diffuseColor.rgb, vec3(0.299,0.587,0.114));
+              vec3 baseCol = mix(vec3(0.18,0.19,0.21), vec3(0.54,0.57,0.61), smoothstep(0.12,0.72,luma));
+              float tendon = smoothstep(0.66,0.78,luma);
+              baseCol = mix(baseCol, vec3(0.84,0.86,0.89), tendon);
+              float pH = 0.0; float sH = 0.0;
+              for (int i=0; i<14; i++) {
+                float w = mWeight(i, vWPos);
+                pH = max(pH, w * uPrimaryMask[i]);
+                sH = max(sH, w * uSecondaryMask[i]);
+              }
+              pH *= (1.0 - tendon * 0.65); sH *= (1.0 - tendon * 0.65);
+              float pulse = 0.90 + 0.10 * sin(uTime * 3.2);
+              vec3 c = mix(baseCol * 0.62, baseCol, max(clamp(pH+sH,0.0,1.0), 0.38));
+              // Earthy Ochre / Burnt Sienna for secondary synergists
+              c = mix(c, vec3(0.76,0.44,0.09), sH * 0.90);
+              // Rich Anatomical Crimson Red for primary target muscles
+              c = mix(c, vec3(0.78,0.11,0.14) * pulse, pH * 0.94);
+              diffuseColor.rgb = c;
+            `);
+        };
+        child.material.needsUpdate = true;
+      }
+    });
+
+    proceduralGroup.visible = false;
+    scene.add(loadedGlbGroup);
+    document.getElementById('model-badge').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span>${fileName} (Cached)`;
+    update3DHighlights();
+    if (!silent) showToast(`Loaded & cached ${fileName} permanently!`);
+  });
+}
+
+async function autoRestoreGlb() {
+  const cached = await getCachedGlb();
+  if (cached && cached.buffer) {
+    await mountGlbBuffer(cached.buffer, cached.name || DEFAULT_GLB_NAME, true);
+    return;
+  }
+  try {
+    const res = await fetch(`./${DEFAULT_GLB_NAME}`);
+    if (res.ok) {
+      const buf = await res.arrayBuffer();
+      await saveGlbToCache(DEFAULT_GLB_NAME, buf);
+      await mountGlbBuffer(buf, DEFAULT_GLB_NAME, true);
+    }
+  } catch (e) {
+    // Fallback to built-in sculptural ecorché until user loads .glb once
+  }
+}
+
+document.getElementById('glb-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  await saveGlbToCache(file.name, buf);
+  await mountGlbBuffer(buf, file.name, false);
+});
+
+// Three-Point Clinical Studio Lighting
+scene.add(new THREE.AmbientLight(0xdbeafe, 0.58));
+
+const keyLight = new THREE.DirectionalLight(0xfff4ea, 1.85);
+keyLight.position.set(2.4, 3.2, 2.6);
+scene.add(keyLight);
+
+const backRimLight = new THREE.DirectionalLight(0x60a5fa, 1.35);
+backRimLight.position.set(-2.4, 2.5, -2.8);
+scene.add(backRimLight);
+
+const underFill = new THREE.DirectionalLight(0xf8fafc, 0.55);
+underFill.position.set(0, -1.5, 1.8);
+scene.add(underFill);
+
+// Subtle Clinical Pedestal Disc & Rings
+const pedestalGroup = new THREE.Group();
+const innerDisc = new THREE.Mesh(
+  new THREE.CircleGeometry(0.42, 64),
+  new THREE.MeshStandardMaterial({ color: 0x11151c, roughness: 0.85, metalness: 0.2 })
+);
+innerDisc.rotation.x = -Math.PI / 2;
+pedestalGroup.add(innerDisc);
+
+const outerRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.42, 0.445, 64),
+  new THREE.MeshBasicMaterial({ color: 0x334155, side: THREE.DoubleSide })
+);
+outerRing.rotation.x = -Math.PI / 2;
+outerRing.position.y = 0.002;
+pedestalGroup.add(outerRing);
+scene.add(pedestalGroup);
+
+// Generate Procedural Striated Muscle Fiber Canvas Texture (Neutral Ash Grey)
+function createStriationTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#686f78';
+  ctx.fillRect(0, 0, 256, 256);
+
+  for (let y = 0; y < 256; y += 2) {
+    const shade = 112 + Math.sin(y * 0.45) * 26 + (Math.random() * 14 - 7);
+    const v = Math.max(55, Math.min(185, Math.round(shade)));
+    ctx.fillStyle = `rgb(${v}, ${v + 2}, ${v + 5})`;
+    ctx.fillRect(0, y, 256, 1.5);
+  }
+  // Subtle neutral fascia micro-lines
+  ctx.strokeStyle = 'rgba(226, 232, 240, 0.14)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 18; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, i * 14);
+    ctx.bezierCurveTo(85, i * 14 + 5, 170, i * 14 - 5, 256, i * 14);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  return tex;
+}
+
+const striationTex = createStriationTexture();
+
+// Build Sculpted Procedural Anatomical Ecorché Figure (1.78m heroic athletic proportions)
+const proceduralGroup = new THREE.Group();
+const muscleMaterials = {}; // Map muscleKey -> array of MeshStandardMaterials
+
+function makeMuscleMat(muscleKey) {
+  const mat = new THREE.MeshStandardMaterial({
+    map: striationTex,
+    bumpMap: striationTex,
+    bumpScale: 0.008,
+    color: new THREE.Color(0x737a84),
+    roughness: 0.46,
+    metalness: 0.08,
+    emissive: new THREE.Color(0x000000),
+    emissiveIntensity: 0
+  });
+  if (!muscleMaterials[muscleKey]) muscleMaterials[muscleKey] = [];
+  muscleMaterials[muscleKey].push(mat);
+  return mat;
+}
+
+const tendonMat = new THREE.MeshStandardMaterial({
+  color: 0xd8dce2,
+  roughness: 0.36,
+  metalness: 0.05
+});
+
+const boneCoreMat = new THREE.MeshStandardMaterial({
+  color: 0x373c44,
+  roughness: 0.72
+});
+
+function addSculptedBellies(parent, geo, mat, positions, rotations, scales) {
+  positions.forEach((pos, idx) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(...pos);
+    if (rotations && rotations[idx]) m.rotation.set(...rotations[idx]);
+    if (scales && scales[idx]) m.scale.set(...scales[idx]);
+    parent.add(m);
+  });
+}
+
+(function buildProceduralEcorche() {
+  const sphere = new THREE.SphereGeometry(1, 28, 22);
+  const capsule = new THREE.CylinderGeometry(0.85, 0.72, 2, 24);
+
+  // Cranium, Jaw & Neck (Sternocleidomastoid)
+  const head = new THREE.Mesh(sphere, tendonMat);
+  head.position.set(0, 1.66, 0.01);
+  head.scale.set(0.088, 0.112, 0.102);
+  proceduralGroup.add(head);
+
+  const jaw = new THREE.Mesh(sphere, makeMuscleMat('upper_back'));
+  jaw.position.set(0, 1.59, 0.032);
+  jaw.scale.set(0.068, 0.058, 0.072);
+  proceduralGroup.add(jaw);
+
+  addSculptedBellies(proceduralGroup, capsule, tendonMat,
+    [[-0.032, 1.52, 0.015], [0.032, 1.52, 0.015]],
+    [[0.12, 0, -0.18], [0.12, 0, 0.18]],
+    [[0.024, 0.065, 0.026], [0.024, 0.065, 0.026]]
+  );
+
+  // Deep Torso Core & Linea Alba Tendon
+  const ribcage = new THREE.Mesh(sphere, boneCoreMat);
+  ribcage.position.set(0, 1.26, -0.005);
+  ribcage.scale.set(0.155, 0.22, 0.105);
+  proceduralGroup.add(ribcage);
+
+  const sternumTendon = new THREE.Mesh(capsule, tendonMat);
+  sternumTendon.position.set(0, 1.24, 0.095);
+  sternumTendon.scale.set(0.016, 0.17, 0.012);
+  proceduralGroup.add(sternumTendon);
+
+  // Upper Chest (Clavicular Pectoralis)
+  addSculptedBellies(proceduralGroup, sphere, makeMuscleMat('upper_chest'),
+    [[-0.078, 1.385, 0.078], [0.078, 1.385, 0.078]],
+    [[0.18, 0.22, -0.25], [0.18, -0.22, 0.25]],
+    [[0.088, 0.044, 0.045], [0.088, 0.044, 0.045]]
+  );
+
+  // Mid/Lower Chest (Sternal Pectoralis Major)
+  addSculptedBellies(proceduralGroup, sphere, makeMuscleMat('chest'),
+    [[-0.082, 1.305, 0.088], [0.082, 1.305, 0.088]],
+    [[0.08, 0.18, -0.12], [0.08, -0.18, 0.12]],
+    [[0.092, 0.068, 0.052], [0.092, 0.068, 0.052]]
+  );
+
+  // Abs & Obliques (6-Pack Rectus Abdominis + Serratus/Obliques)
+  const absMat = makeMuscleMat('abs');
+  for (let row = 0; row < 3; row++) {
+    const yPos = 1.155 - row * 0.068;
+    const zPos = 0.088 - row * 0.004;
+    addSculptedBellies(proceduralGroup, sphere, absMat,
+      [[-0.036, yPos, zPos], [0.036, yPos, zPos]],
+      [[0, 0, 0], [0, 0, 0]],
+      [[0.034, 0.032, 0.025], [0.034, 0.032, 0.025]]
+    );
+  }
+  addSculptedBellies(proceduralGroup, sphere, absMat,
+    [[-0.118, 1.07, 0.035], [0.118, 1.07, 0.035]],
+    [[0, 0, 0.15], [0, 0, -0.15]],
+    [[0.044, 0.11, 0.068], [0.044, 0.11, 0.068]]
+  );
+
+  // Upper Back & Traps (Trapezius + Rhomboids + Spine Tendon)
+  const upperBackMat = makeMuscleMat('upper_back');
+  addSculptedBellies(proceduralGroup, sphere, upperBackMat,
+    [[-0.065, 1.47, -0.048], [0.065, 1.47, -0.048], [-0.068, 1.33, -0.088], [0.068, 1.33, -0.088]],
+    [[-0.25, 0, 0.38], [-0.25, 0, -0.38], [-0.08, 0, 0.12], [-0.08, 0, -0.12]],
+    [[0.075, 0.062, 0.055], [0.075, 0.062, 0.055], [0.072, 0.115, 0.045], [0.072, 0.115, 0.045]]
+  );
+
+  const spineTendon = new THREE.Mesh(capsule, tendonMat);
+  spineTendon.position.set(0, 1.24, -0.098);
+  spineTendon.scale.set(0.015, 0.22, 0.014);
+  proceduralGroup.add(spineTendon);
+
+  // Lats (Latissimus Dorsi V-Taper Sweeps)
+  const latsMat = makeMuscleMat('lats');
+  addSculptedBellies(proceduralGroup, sphere, latsMat,
+    [[-0.125, 1.21, -0.052], [0.125, 1.21, -0.052]],
+    [[0, 0.25, -0.22], [0, -0.25, 0.22]],
+    [[0.078, 0.155, 0.062], [0.078, 0.155, 0.062]]
+  );
+
+  // Thoracolumbar Fascia (Lower Back Diamond Tendon)
+  const lowerBackFascia = new THREE.Mesh(sphere, tendonMat);
+  lowerBackFascia.position.set(0, 1.03, -0.075);
+  lowerBackFascia.scale.set(0.078, 0.085, 0.032);
+  proceduralGroup.add(lowerBackFascia);
+
+  // 3D Deltoids (Front, Side, Rear Heads)
+  const frontDeltMat = makeMuscleMat('front_delts');
+  const sideDeltMat = makeMuscleMat('side_delts');
+  const rearDeltMat = makeMuscleMat('rear_delts');
+
+  [-1, 1].forEach(side => {
+    const fd = new THREE.Mesh(sphere, frontDeltMat);
+    fd.position.set(side * 0.205, 1.40, 0.045);
+    fd.scale.set(0.052, 0.068, 0.052);
+    proceduralGroup.add(fd);
+
+    const sd = new THREE.Mesh(sphere, sideDeltMat);
+    sd.position.set(side * 0.232, 1.405, -0.004);
+    sd.rotation.z = side * -0.22;
+    sd.scale.set(0.056, 0.076, 0.058);
+    proceduralGroup.add(sd);
+
+    const rd = new THREE.Mesh(sphere, rearDeltMat);
+    rd.position.set(side * 0.205, 1.40, -0.052);
+    rd.scale.set(0.052, 0.066, 0.052);
+    proceduralGroup.add(rd);
+  });
+
+  // Arms: Biceps, Triceps & Forearms (Heroic Athletic Sweep)
+  const bicepMat = makeMuscleMat('biceps');
+  const tricepMat = makeMuscleMat('triceps');
+  const forearmMat = makeMuscleMat('forearms');
+
+  [-1, 1].forEach(side => {
+    // Biceps Brachii (Long & Short Heads)
+    const bic = new THREE.Mesh(sphere, bicepMat);
+    bic.position.set(side * 0.268, 1.24, 0.025);
+    bic.rotation.set(0.08, 0, side * -0.18);
+    bic.scale.set(0.046, 0.105, 0.048);
+    proceduralGroup.add(bic);
+
+    // Triceps Brachii (Lateral & Long Heads Horseshoe)
+    const triLong = new THREE.Mesh(sphere, tricepMat);
+    triLong.position.set(side * 0.262, 1.245, -0.036);
+    triLong.rotation.set(-0.08, 0, side * -0.18);
+    triLong.scale.set(0.048, 0.112, 0.048);
+    proceduralGroup.add(triLong);
+
+    // Elbow Olecranon Tendon
+    const elbow = new THREE.Mesh(sphere, tendonMat);
+    elbow.position.set(side * 0.305, 1.12, -0.012);
+    elbow.scale.set(0.038, 0.034, 0.038);
+    proceduralGroup.add(elbow);
+
+    // Forearms (Brachioradialis + Flexors/Extensors)
+    const fa = new THREE.Mesh(capsule, forearmMat);
+    fa.position.set(side * 0.355, 0.99, 0.018);
+    fa.rotation.set(0.18, 0, side * -0.24);
+    fa.scale.set(0.046, 0.115, 0.044);
+    proceduralGroup.add(fa);
+
+    // Wrist Tendon & Hand
+    const wrist = new THREE.Mesh(sphere, tendonMat);
+    wrist.position.set(side * 0.405, 0.85, 0.042);
+    wrist.scale.set(0.032, 0.055, 0.024);
+    proceduralGroup.add(wrist);
+  });
+
+  // Pelvis / Hip Girdle (Neutral Anatomical Base)
+  const pelvis = new THREE.Mesh(sphere, boneCoreMat);
+  pelvis.position.set(0, 0.91, -0.01);
+  pelvis.scale.set(0.145, 0.095, 0.098);
+  proceduralGroup.add(pelvis);
+
+  // Legs: Quads, Hamstrings, Patellar Tendons & Calves
+  const quadMat = makeMuscleMat('quads');
+  const hamMat = makeMuscleMat('hamstrings');
+  const calfMat = makeMuscleMat('calves');
+
+  [-1, 1].forEach(side => {
+    // Quadriceps Sweep (Vastus Lateralis, Rectus Femoris, VMO)
+    const quadOuter = new THREE.Mesh(sphere, quadMat);
+    quadOuter.position.set(side * 0.118, 0.71, 0.028);
+    quadOuter.rotation.z = side * 0.05;
+    quadOuter.scale.set(0.072, 0.185, 0.074);
+    proceduralGroup.add(quadOuter);
+
+    const quadInner = new THREE.Mesh(sphere, quadMat);
+    quadInner.position.set(side * 0.088, 0.66, 0.042);
+    quadInner.scale.set(0.056, 0.145, 0.058);
+    proceduralGroup.add(quadInner);
+
+    // Hamstrings (Biceps Femoris & Semitendinosus)
+    const ham = new THREE.Mesh(sphere, hamMat);
+    ham.position.set(side * 0.105, 0.70, -0.042);
+    ham.rotation.z = side * 0.04;
+    ham.scale.set(0.068, 0.175, 0.064);
+    proceduralGroup.add(ham);
+
+    // Knee / Patellar Tendon
+    const knee = new THREE.Mesh(sphere, tendonMat);
+    knee.position.set(side * 0.102, 0.50, 0.012);
+    knee.scale.set(0.052, 0.048, 0.052);
+    proceduralGroup.add(knee);
+
+    // Calves (Gastrocnemius Diamond + Achilles Tendon)
+    const calf = new THREE.Mesh(sphere, calfMat);
+    calf.position.set(side * 0.104, 0.34, -0.024);
+    calf.scale.set(0.054, 0.125, 0.054);
+    proceduralGroup.add(calf);
+
+    const shin = new THREE.Mesh(capsule, tendonMat);
+    shin.position.set(side * 0.102, 0.28, 0.008);
+    shin.scale.set(0.036, 0.19, 0.038);
+    proceduralGroup.add(shin);
+
+    // Foot
+    const foot = new THREE.Mesh(sphere, tendonMat);
+    foot.position.set(side * 0.105, 0.032, 0.045);
+    foot.scale.set(0.044, 0.028, 0.095);
+    proceduralGroup.add(foot);
+  });
+
+  scene.add(proceduralGroup);
+})();
+
+// ============================================================================
+// 4. ORBIT, ZOOM, PAN & SMOOTH CAMERA PRESETS (Zero External Addon Needed)
+// ============================================================================
+const camState = {
+  theta: -2.55,     // Horizontal orbit angle (radians)
+  phi: 1.44,        // Polar angle from +Y
+  radius: 2.55,
+  target: new THREE.Vector3(0, 0.95, 0),
+  desiredTheta: null,
+  desiredPhi: null,
+  desiredRadius: null,
+  desiredTarget: null,
+  autoRotate: false
+};
+
+function updateCameraFromSpherical() {
+  camState.phi = Math.max(0.25, Math.min(Math.PI - 0.15, camState.phi));
+  camState.radius = Math.max(0.85, Math.min(4.8, camState.radius));
+  const sinPhi = Math.sin(camState.phi);
+  camera.position.set(
+    camState.target.x + camState.radius * sinPhi * Math.sin(camState.theta),
+    camState.target.y + camState.radius * Math.cos(camState.phi),
+    camState.target.z + camState.radius * sinPhi * Math.cos(camState.theta)
+  );
+  camera.lookAt(camState.target);
+}
+updateCameraFromSpherical();
+
+function flyToAngle(angleKey) {
+  const presets = {
+    front: { theta: 0.0,   phi: 1.46, radius: 2.45, target: [0, 0.96, 0] },
+    back:  { theta: Math.PI, phi: 1.46, radius: 2.45, target: [0, 0.96, 0] },
+    side:  { theta: 1.15,  phi: 1.42, radius: 2.25, target: [0, 1.02, 0] },
+    '34':  { theta: 0.58,  phi: 1.42, radius: 2.40, target: [0, 0.96, 0] }
+  };
+  const p = presets[angleKey] || presets.front;
+  let diff = (p.theta - camState.theta) % (Math.PI * 2);
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  if (diff < -Math.PI) diff += Math.PI * 2;
+  camState.desiredTheta = camState.theta + diff;
+  camState.desiredPhi = p.phi;
+  camState.desiredRadius = p.radius;
+  camState.desiredTarget = new THREE.Vector3(...p.target);
+}
+
+// Mouse & Touch Orbit/Zoom/Pan Listeners
+let isDragging = false;
+let isPanning = false;
+let prevPointer = { x: 0, y: 0 };
+
+canvas.addEventListener('pointerdown', (e) => {
+  isDragging = true;
+  isPanning = (e.button === 2 || e.shiftKey);
+  prevPointer = { x: e.clientX, y: e.clientY };
+  camState.desiredTheta = null;
+});
+window.addEventListener('pointerup', () => { isDragging = false; isPanning = false; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+window.addEventListener('pointermove', (e) => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevPointer.x;
+  const dy = e.clientY - prevPointer.y;
+  prevPointer = { x: e.clientX, y: e.clientY };
+
+  if (isPanning) {
+    camState.target.y = Math.max(0.2, Math.min(1.7, camState.target.y + dy * 0.0022));
+  } else {
+    camState.theta -= dx * 0.0075;
+    camState.phi -= dy * 0.0065;
+  }
+  updateCameraFromSpherical();
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  camState.desiredTheta = null;
+  camState.radius += e.deltaY * 0.0014;
+  updateCameraFromSpherical();
+}, { passive: false });
+
+// ============================================================================
+// 5. SYNCHRONIZE 3D MUSCLE HIGHLIGHTS & STATUS BANNER
+// ============================================================================
+let activePrimarySet = new Set();
+let activeSecondarySet = new Set();
+
+function update3DHighlights() {
+  const day = state.split[state.viewedDayIdx];
+  const priArr = new Float32Array(14);
+  const secArr = new Float32Array(14);
+  activePrimarySet = new Set();
+  activeSecondarySet = new Set();
+
+  let statusText = '';
+  if (state.selectedExIdx !== null && day.exercises[state.selectedExIdx]) {
+    const ex = day.exercises[state.selectedExIdx];
+    ex.primary.forEach((m) => {
+      activePrimarySet.add(m);
+      const idx = MUSCLE_KEYS.indexOf(m);
+      if (idx >= 0) priArr[idx] = 1.0;
+    });
+    ex.secondary.forEach((m) => {
+      if (!activePrimarySet.has(m)) {
+        activeSecondarySet.add(m);
+        const idx = MUSCLE_KEYS.indexOf(m);
+        if (idx >= 0) secArr[idx] = 1.0;
+      }
+    });
+    const priLabels = ex.primary.map((m) => MUSCLE_INFO[m]?.latin || m).join(', ');
+    statusText = `${ex.name} • Primary: ${priLabels}`;
+    flyToAngle(ex.angle || day.defaultAngle);
+  } else {
+    day.exercises.forEach((ex) => {
+      ex.primary.forEach((m) => {
+        activePrimarySet.add(m);
+        const idx = MUSCLE_KEYS.indexOf(m);
+        if (idx >= 0) priArr[idx] = 1.0;
+      });
+    });
+    day.exercises.forEach((ex) => {
+      ex.secondary.forEach((m) => {
+        if (!activePrimarySet.has(m)) {
+          activeSecondarySet.add(m);
+          const idx = MUSCLE_KEYS.indexOf(m);
+          if (idx >= 0) secArr[idx] = 1.0;
+        }
+      });
+    });
+    const summaryLabels = Array.from(activePrimarySet).map((m) => MUSCLE_INFO[m]?.short || m).join(', ');
+    statusText = `${day.name} • ${summaryLabels}`;
+    flyToAngle(day.defaultAngle);
+  }
+
+  glbUniforms.uPrimaryMask.value = priArr;
+  glbUniforms.uSecondaryMask.value = secArr;
+  document.getElementById('status-banner').textContent = statusText;
+}
+
+// ============================================================================
+// 6. CLINICAL INSPECTOR, CUSTOM DROPDOWN & SET / WEIGHT (KG) / REPS LOGGER UI
+// ============================================================================
+let swappingIdx = null;
+const dropdownTrigger = document.getElementById('day-dropdown-trigger');
+const dropdownMenu = document.getElementById('day-dropdown-menu');
+const dropdownChevron = document.getElementById('dd-chevron');
+
+function setDropdownOpen(open) {
+  dropdownMenu.classList.toggle('hidden', !open);
+  dropdownTrigger.setAttribute('aria-expanded', String(open));
+  dropdownChevron.classList.toggle('rotate-180', open);
+}
+
+dropdownTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = !dropdownMenu.classList.contains('hidden');
+  setDropdownOpen(!isOpen);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#day-dropdown')) {
+    setDropdownOpen(false);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    setDropdownOpen(false);
+    closeSwapModal();
+  }
+});
+
+function renderInspector(preserveScroll = true) {
+  const list = document.getElementById('exercise-list');
+  const savedScrollTop = preserveScroll && list ? list.scrollTop : 0;
+
+  const currentDay = state.split[state.viewedDayIdx];
+  const splitParts = currentDay.name.split(' — ');
+  const dayTag = (splitParts[0] || `Day ${state.viewedDayIdx + 1}`).toUpperCase();
+  const shortTitle = splitParts[1] || currentDay.name;
+
+  document.getElementById('dd-trigger-day').textContent = dayTag;
+  document.getElementById('dd-trigger-title').textContent = shortTitle;
+  document.getElementById('dd-trigger-sub').textContent = currentDay.subtitle;
+  document.getElementById('dd-trigger-next').classList.toggle('hidden', state.viewedDayIdx !== state.queuedDayIdx);
+
+  dropdownMenu.innerHTML = '';
+  state.split.forEach((d, idx) => {
+    const parts = d.name.split(' — ');
+    const tag = (parts[0] || `Day ${idx + 1}`).toUpperCase();
+    const label = parts[1] || d.name;
+    const isViewed = idx === state.viewedDayIdx;
+    const isQueued = idx === state.queuedDayIdx;
+
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', String(isViewed));
+    item.className = `w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-2.5 transition ${
+      isViewed ? 'bg-slate-100/90' : 'hover:bg-slate-50'
+    }`;
+
+    item.innerHTML = `
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+            isViewed ? 'bg-slate-900 text-white' : 'bg-slate-200/80 text-slate-700'
+          }">${tag}</span>
+          <span class="text-xs font-bold text-slate-900 truncate">${label}</span>
+          ${isQueued ? '<span class="text-[9.5px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">Next Up</span>' : ''}
+        </div>
+        <div class="text-[10.5px] text-slate-500 truncate mt-0.5">${d.subtitle}</div>
+      </div>
+      <span class="text-xs font-extrabold ${isViewed ? 'text-red-700' : 'text-transparent'}">✓</span>
+    `;
+
+    item.addEventListener('click', () => {
+      state.viewedDayIdx = idx;
+      state.selectedExIdx = null;
+      setDropdownOpen(false);
+      saveState();
+      renderInspector(false);
+      update3DHighlights();
+    });
+
+    dropdownMenu.appendChild(item);
+  });
+
+  const day = state.split[state.viewedDayIdx];
+  document.getElementById('day-title').textContent = day.name;
+  document.getElementById('day-subtitle').textContent = day.subtitle;
+  document.getElementById('postpone-counter').textContent = `Rest days paused: ${state.postponedDays}`;
+
+  const badge = document.getElementById('queue-badge');
+  if (state.viewedDayIdx === state.queuedDayIdx) {
+    badge.textContent = 'QUEUED NEXT UP';
+    badge.className = 'text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-700';
+  } else {
+    badge.textContent = 'PREVIEWING SPLIT DAY';
+    badge.className = 'text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700';
+  }
+
+  list.innerHTML = '';
+
+  day.exercises.forEach((ex, idx) => {
+    const isSelected = state.selectedExIdx === idx;
+    const card = document.createElement('div');
+    card.className = `ex-card rounded-xl border border-slate-200 bg-white p-3 cursor-pointer ${isSelected ? 'active' : ''}`;
+
+    const ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' proper form')}`;
+    const bestSet = (ex.sets || []).reduce((best, s) => (Number(s.w) > best.w ? { w: Number(s.w), r: Number(s.r) } : best), { w: 0, r: 0 });
+    const targetBadge = bestSet.w > 0 ? `PR / Beat: ${bestSet.w} kg × ${bestSet.r}` : `Target: ${ex.target || 'Set Baseline'}`;
+
+    const setsHtml = (ex.sets || []).map((s, sIdx) => `
+      <div class="flex items-center gap-1.5 text-[11px] bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1">
+        <span class="font-bold text-slate-400 w-9">Set ${sIdx + 1}</span>
+        <input type="number" step="0.5" value="${s.w}" data-ex="${idx}" data-set="${sIdx}" data-field="w"
+          class="set-input w-16 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:border-blue-500" />
+        <span class="text-slate-400 font-semibold">kg ×</span>
+        <input type="number" step="1" value="${s.r}" data-ex="${idx}" data-set="${sIdx}" data-field="r"
+          class="set-input w-12 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:border-blue-500" />
+        <span class="text-slate-400 font-semibold">reps</span>
+        <button data-ex="${idx}" data-set="${sIdx}" class="del-set-btn ml-auto text-slate-400 hover:text-rose-600 font-bold px-1" title="Remove set">✕</button>
+      </div>
+    `).join('');
+
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="text-[13px] font-extrabold text-slate-900 leading-snug">${idx + 1}. ${ex.name}</div>
+        <span class="text-[11px] font-bold text-blue-600 whitespace-nowrap">${ex.meta}</span>
+      </div>
+      <p class="text-[11.5px] text-slate-500 mt-0.5 leading-snug">${ex.cue}</p>
+
+      <!-- Primary & Secondary Muscle Chips + Form / Swap Actions -->
+      <div class="flex flex-wrap items-center gap-1 mt-2">
+        ${ex.primary.map(m => `<span class="text-[9.5px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-red-100 text-red-800">${MUSCLE_INFO[m]?.short || m}</span>`).join('')}
+        ${ex.secondary.map(m => `<span class="text-[9.5px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">${MUSCLE_INFO[m]?.short || m}</span>`).join('')}
+        <div class="ml-auto flex items-center gap-1">
+          <a href="${ytUrl}" target="_blank" rel="noopener" class="text-[10.5px] font-semibold px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600">
+            Form ↗
+          </a>
+          <button data-idx="${idx}" class="swap-btn text-[10.5px] font-semibold px-2 py-0.5 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700">
+            Swap
+          </button>
+        </div>
+      </div>
+
+      <!-- Set / Weight (kg) / Reps Logger -->
+      <div class="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5 logger-zone">
+        <div class="flex items-center justify-between text-[10.5px]">
+          <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">${targetBadge}</span>
+          <button data-ex="${idx}" class="add-set-btn font-bold text-blue-600 hover:text-blue-800 px-1.5 py-0.5 rounded hover:bg-blue-50">
+            + Add Set
+          </button>
+        </div>
+        <div class="space-y-1">
+          ${setsHtml}
+        </div>
+      </div>
+    `;
+
+    // Clicking card selects/highlights exercise on 3D Ecorché
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input')) return;
+      state.selectedExIdx = state.selectedExIdx === idx ? null : idx;
+      saveState();
+      renderInspector(true);
+      update3DHighlights();
+    });
+
+    // Set input changes (update PR badge live without wiping focus or scroll)
+    card.querySelectorAll('.set-input').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const eIdx = Number(e.target.dataset.ex);
+        const sIdx = Number(e.target.dataset.set);
+        const field = e.target.dataset.field;
+        day.exercises[eIdx].sets[sIdx][field] = Number(e.target.value) || 0;
+        saveState();
+        const best = (day.exercises[eIdx].sets || []).reduce(
+          (b, s) => (Number(s.w) > b.w ? { w: Number(s.w), r: Number(s.r) } : b),
+          { w: 0, r: 0 }
+        );
+        const prLabel = card.querySelector('.logger-zone span');
+        if (prLabel) {
+          prLabel.textContent = best.w > 0 ? `PR / Beat: ${best.w} kg × ${best.r}` : `Target: ${day.exercises[eIdx].target || 'Set Baseline'}`;
+        }
+      });
+    });
+
+    // Add Set button
+    card.querySelector('.add-set-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const eIdx = Number(e.target.dataset.ex);
+      const prev = day.exercises[eIdx].sets;
+      const last = prev[prev.length - 1] || { w: 15, r: 10 };
+      prev.push({ w: last.w, r: last.r });
+      saveState();
+      renderInspector(true);
+      showToast('Added set to ' + day.exercises[eIdx].name);
+    });
+
+    // Remove Set button
+    card.querySelectorAll('.del-set-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eIdx = Number(e.target.dataset.ex);
+        const sIdx = Number(e.target.dataset.set);
+        if (day.exercises[eIdx].sets.length > 1) {
+          day.exercises[eIdx].sets.splice(sIdx, 1);
+          saveState();
+          renderInspector(true);
+        }
+      });
+    });
+
+    // Swap Exercise button
+    card.querySelector('.swap-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      swappingIdx = idx;
+      document.getElementById('swap-name').value = ex.name;
+      document.getElementById('swap-meta').value = ex.meta;
+      document.getElementById('swap-cue').value = ex.cue;
+      document.getElementById('swap-primary').value = ex.primary[0] || 'chest';
+      const modal = document.getElementById('swap-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+
+    list.appendChild(card);
+  });
+
+  if (preserveScroll) {
+    list.scrollTop = savedScrollTop;
+  } else {
+    list.scrollTop = 0;
+  }
+}
+
+// ============================================================================
+// 7. ROLLING QUEUE, POSTPONE, SWAP MODAL & TOOLBAR CONTROLS
+// ============================================================================
+document.getElementById('btn-scroll-top').addEventListener('click', () => {
+  const list = document.getElementById('exercise-list');
+  if (list) list.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+document.getElementById('btn-highlight-day').addEventListener('click', () => {
+  state.selectedExIdx = null;
+  saveState();
+  renderInspector(true);
+  update3DHighlights();
+});
+
+document.getElementById('btn-postpone').addEventListener('click', () => {
+  state.postponedDays += 1;
+  saveState();
+  renderInspector(true);
+  const queuedName = state.split[state.queuedDayIdx].name;
+  showToast(`Rest day logged! ${queuedName} stays queued next without skipping.`);
+});
+
+document.getElementById('btn-complete').addEventListener('click', () => {
+  const finishedName = state.split[state.queuedDayIdx].name;
+  state.queuedDayIdx = (state.queuedDayIdx + 1) % state.split.length;
+  state.viewedDayIdx = state.queuedDayIdx;
+  state.selectedExIdx = null;
+  saveState();
+  renderInspector(false);
+  update3DHighlights();
+  showToast(`Completed ${finishedName} → Advanced to ${state.split[state.queuedDayIdx].name}`);
+});
+
+function buildSyncSummary() {
+  const day = state.split[state.viewedDayIdx];
+  const loggedLines = day.exercises.map(ex => {
+    const setsStr = (ex.sets || []).map(s => `${s.w}kg×${s.r}`).join(', ');
+    return `${ex.name}: [${setsStr}]`;
+  }).join(' | ');
+  return `J.A.R.V.I.S. Sync | Queued Next: ${state.split[state.queuedDayIdx].name} | Rest Paused: ${state.postponedDays} | Viewed (${day.name}): ${loggedLines}`;
+}
+
+document.getElementById('btn-copy-sync').addEventListener('click', () => {
+  const summary = buildSyncSummary();
+  const ta = document.createElement('textarea');
+  ta.value = summary;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  showToast('Copied workout & set/weight sync string to clipboard!');
+});
+
+// Swap Modal Handlers
+function closeSwapModal() {
+  const modal = document.getElementById('swap-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+document.getElementById('swap-close-x').addEventListener('click', closeSwapModal);
+document.getElementById('swap-cancel').addEventListener('click', closeSwapModal);
+
+document.getElementById('swap-save').addEventListener('click', () => {
+  if (swappingIdx === null) return;
+  const day = state.split[state.viewedDayIdx];
+  const newName = document.getElementById('swap-name').value.trim();
+  const newMeta = document.getElementById('swap-meta').value.trim();
+  const newCue = document.getElementById('swap-cue').value.trim();
+  const newPri = document.getElementById('swap-primary').value;
+  if (newName) {
+    const existingSets = day.exercises[swappingIdx].sets || [{ w: 15, r: 10 }, { w: 15, r: 10 }, { w: 15, r: 10 }];
+    day.exercises[swappingIdx] = {
+      name: newName,
+      meta: newMeta || '3 × 10–12 | Rest: 75s',
+      cue: newCue || 'Controlled eccentric, full range of motion.',
+      primary: [newPri],
+      secondary: [],
+      angle: ['lats', 'upper_back', 'rear_delts', 'hamstrings', 'calves'].includes(newPri) ? 'back' : 'front',
+      sets: existingSets
+    };
+    saveState();
+    renderInspector();
+    update3DHighlights();
+    showToast(`Swapped permanently to ${newName}`);
+  }
+  closeSwapModal();
+});
+
+// Floating BioDigital Viewport Toolbar
+document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  setTimeout(handleResize, 260);
+});
+document.getElementById('btn-view-front').addEventListener('click', () => flyToAngle('front'));
+document.getElementById('btn-view-back').addEventListener('click', () => flyToAngle('back'));
+document.getElementById('btn-view-34').addEventListener('click', () => flyToAngle('34'));
+document.getElementById('btn-reset-cam').addEventListener('click', () => flyToAngle(state.split[state.viewedDayIdx].defaultAngle));
+document.getElementById('btn-auto-rotate').addEventListener('click', (e) => {
+  camState.autoRotate = !camState.autoRotate;
+  e.target.classList.toggle('bg-blue-600', camState.autoRotate);
+  e.target.classList.toggle('text-white', camState.autoRotate);
+  showToast(`360° Auto-Rotate: ${camState.autoRotate ? 'ON' : 'OFF'}`);
+});
+
+// ============================================================================
+// 8. J.A.R.V.I.S. GEMINI LIVE COMMAND BAR (Structured Action Execution)
+// ============================================================================
+const jarvisDrawer = document.getElementById('jarvis-drawer');
+const jarvisChevron = document.getElementById('jarvis-chevron');
+document.getElementById('gemini-api-key').value = state.apiKey || '';
+
+document.getElementById('btn-toggle-jarvis').addEventListener('click', () => {
+  const isHidden = jarvisDrawer.classList.toggle('hidden');
+  jarvisChevron.textContent = isHidden ? '▲ Expand' : '▼ Collapse';
+});
+
+document.getElementById('btn-save-key').addEventListener('click', () => {
+  state.apiKey = document.getElementById('gemini-api-key').value.trim();
+  saveState();
+  showToast(state.apiKey ? 'Gemini API key saved locally!' : 'Cleared custom key (using built-in endpoint).');
+});
+
+document.querySelectorAll('.quick-cmd').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('jarvis-command-input').value = btn.dataset.cmd;
+    runJarvisCommand();
+  });
+});
+
+document.getElementById('btn-run-jarvis').addEventListener('click', runJarvisCommand);
+document.getElementById('jarvis-command-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') runJarvisCommand();
+});
+
+async function runJarvisCommand() {
+  const inputEl = document.getElementById('jarvis-command-input');
+  const respBox = document.getElementById('jarvis-response');
+  const cmd = inputEl.value.trim();
+  if (!cmd) return;
+
+  respBox.classList.remove('hidden');
+  respBox.textContent = 'J.A.R.V.I.S. processing command...';
+
+  const day = state.split[state.viewedDayIdx];
+  const selectedEx = state.selectedExIdx !== null ? day.exercises[state.selectedExIdx] : null;
+  const apiKey = state.apiKey || '';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+  const systemPrompt = `You are J.A.R.V.I.S., an intelligent hypertrophy & biomechanics assistant controlling a 6-day rolling workout app.
+User constraints: NO push-ups, NO pull-ups, NO glute-focused leg compounds (no barbell squats/deadlifts/lunges). Focus on upper-body V-taper, arms, delts, and pure quad/hamstring hypertrophy.
+Valid muscle keys: chest, upper_chest, lats, upper_back, front_delts, side_delts, rear_delts, biceps, triceps, forearms, quads, hamstrings, calves, abs.
+Current Day Index: ${state.viewedDayIdx} (${day.name}).
+Current Exercises: ${JSON.stringify(day.exercises.map((e, i) => ({ index: i, name: e.name, meta: e.meta, primary: e.primary })))}.
+Selected Exercise: ${selectedEx ? JSON.stringify({ index: state.selectedExIdx, name: selectedEx.name }) : 'None'}.
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "action": "postpone" | "complete" | "swap" | "advice",
+  "targetIndex": number,
+  "newExercise": { "name": string, "meta": string, "cue": string, "primary": [string] },
+  "reply": string
+}`;
+
+  const payload = {
+    contents: [{ parts: [{ text: cmd }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { responseMimeType: 'application/json' }
+  };
+
+  try {
+    let resultData = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        resultData = await res.json();
+        break;
+      }
+      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+    }
+
+    const rawText = resultData?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) throw new Error('Empty response');
+    const parsed = JSON.parse(rawText);
+
+    if (parsed.action === 'postpone') {
+      state.postponedDays += 1;
+    } else if (parsed.action === 'complete') {
+      state.queuedDayIdx = (state.queuedDayIdx + 1) % state.split.length;
+      state.viewedDayIdx = state.queuedDayIdx;
+      state.selectedExIdx = null;
+    } else if (parsed.action === 'swap' && parsed.newExercise && typeof parsed.targetIndex === 'number' && day.exercises[parsed.targetIndex]) {
+      const validPrimary = (parsed.newExercise.primary || []).filter(k => MUSCLE_INFO[k]);
+      const pKey = validPrimary[0] || day.exercises[parsed.targetIndex].primary[0];
+      day.exercises[parsed.targetIndex] = {
+        name: parsed.newExercise.name,
+        meta: parsed.newExercise.meta || '3 × 10–12 | Rest: 75s',
+        cue: parsed.newExercise.cue || 'Strict control, full hypertrophy stretch.',
+        primary: validPrimary.length ? validPrimary : [pKey],
+        secondary: [],
+        angle: ['lats', 'upper_back', 'rear_delts', 'hamstrings', 'calves'].includes(pKey) ? 'back' : 'front',
+        sets: day.exercises[parsed.targetIndex].sets
+      };
+    }
+
+    saveState();
+    renderInspector();
+    update3DHighlights();
+    respBox.textContent = parsed.reply || 'Command executed.';
+    inputEl.value = '';
+  } catch (err) {
+    // Offline/No-Key Smart Local Fallback Parser
+    const lower = cmd.toLowerCase();
+    if (lower.includes('postpone') || lower.includes('rest')) {
+      state.postponedDays += 1;
+      saveState();
+      renderInspector();
+      respBox.textContent = `Rest day logged locally. ${state.split[state.queuedDayIdx].name} remains queued next without skipping.`;
+    } else if (lower.includes('complete') || lower.includes('done') || lower.includes('next')) {
+      state.queuedDayIdx = (state.queuedDayIdx + 1) % state.split.length;
+      state.viewedDayIdx = state.queuedDayIdx;
+      state.selectedExIdx = null;
+      saveState();
+      renderInspector();
+      update3DHighlights();
+      respBox.textContent = `Advanced rolling queue to ${state.split[state.queuedDayIdx].name}.`;
+    } else {
+      respBox.textContent = 'Tip: Click "Swap" on any exercise card to edit it directly, or paste a Gemini API key above for live AI exercise substitutions.';
+    }
+  }
+}
+
+// ============================================================================
+// 9. ANIMATION LOOP & RESPONSIVE RESIZE
+// ============================================================================
+function handleResize() {
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+}
+window.addEventListener('resize', handleResize);
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  glbUniforms.uTime.value = t;
+
+  // Smooth camera transition to target muscle angle
+  if (camState.desiredTheta !== null) {
+    camState.theta += (camState.desiredTheta - camState.theta) * 0.09;
+    camState.phi += (camState.desiredPhi - camState.phi) * 0.09;
+    camState.radius += (camState.desiredRadius - camState.radius) * 0.09;
+    camState.target.lerp(camState.desiredTarget, 0.09);
+    updateCameraFromSpherical();
+    if (Math.abs(camState.desiredTheta - camState.theta) < 0.005) {
+      camState.desiredTheta = null;
+    }
+  } else if (camState.autoRotate && !isDragging) {
+    camState.theta += 0.006;
+    updateCameraFromSpherical();
+  }
+
+  // Rich Anatomical Red (Primary) & Warm Earthy Ochre (Secondary) on Neutral Ash Grey Body
+  const pulse = 0.85 + 0.15 * Math.sin(t * 3.4);
+  const hasAnyHighlight = activePrimarySet.size > 0 || activeSecondarySet.size > 0;
+
+  Object.entries(muscleMaterials).forEach(([key, mats]) => {
+    const isPrimary = activePrimarySet.has(key);
+    const isSecondary = activeSecondarySet.has(key);
+
+    mats.forEach(mat => {
+      if (isPrimary) {
+        mat.color.setHex(0xc81e2b);
+        mat.emissive.setHex(0x88131b);
+        mat.emissiveIntensity = 0.36 * pulse;
+      } else if (isSecondary) {
+        mat.color.setHex(0xc67d1b);
+        mat.emissive.setHex(0x854d0e);
+        mat.emissiveIntensity = 0.22;
+      } else {
+        mat.color.setHex(hasAnyHighlight ? 0x5c626b : 0x737a84);
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+      }
+    });
+  });
+
+  renderer.render(scene, camera);
+}
+
+window.onload = function () {
+  renderInspector();
+  update3DHighlights();
+  autoRestoreGlb();
+  animate();
+};
+const DB_URL = "https://jarvis-sync-37fef-default-rtdb.asia-southeast1.firebasedatabase.app/jarvis_state.json";
+
+async function pullCloudSync() {
+  try {
+    const res = await fetch(DB_URL);
+    const cloudData = await res.json();
+    if (cloudData && cloudData.updatedAt > (Number(localStorage.getItem("jarvis_updated")) || 0)) {
+      Object.keys(cloudData.storage || {}).forEach(k => localStorage.setItem(k, cloudData.storage[k]));
+      localStorage.setItem("jarvis_updated", cloudData.updatedAt);
+      location.reload();
+    }
+  } catch (e) {}
+}
+
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, val) {
+  _origSetItem(key, val);
+  if (key === "jarvis_updated") return;
+  const now = Date.now();
+  _origSetItem("jarvis_updated", now);
+  const snapshot = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k !== "jarvis_updated") snapshot[k] = localStorage.getItem(k);
+  }
+  fetch(DB_URL, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ updatedAt: now, storage: snapshot })
+  }).catch(() => {});
+};
+
+window.addEventListener("load", pullCloudSync);
+</script>
+</body>
+</html>
